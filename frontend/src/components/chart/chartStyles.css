@@ -1,0 +1,55 @@
+.chart-container{
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 620px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #cbb7ff;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+}
+
+.chart-background{
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.30;
+  filter: saturate(1.05);
+  z-index: 0;
+}
+
+.chart-svg{
+  position: relative;
+  z-index: 1;
+  display: block;
+}
+
+.aspect-positive{
+  stroke: #f3a6c8; /* tatlı pembe */
+  opacity: 0.85;
+}
+
+.aspect-negative{
+  stroke: #9fd3ff; /* bebe mavisi */
+  opacity: 0.85;
+}
+
+.aspect-neutral{
+  stroke: rgba(203,183,255,0.75); /* lavender */
+  opacity: 0.55;
+}
+
+.zodiac-label{
+  font-size: 10px;
+  fill: #7b6c9d;
+  letter-spacing: 0.6px;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto;
+}
+
+.planet-degree{
+  font-size: 10px;
+  fill: #6e5c8c;
+  opacity: 0.95;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto;
+}

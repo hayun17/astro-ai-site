@@ -1,0 +1,32 @@
+[TYPE=RULE]
+[KEY=output_structure_extent]
+
+OUTPUT STRUCTURE (follow this order)
+
+0) Opening Snapshot (3–5 sentences)
+- Bold, catchy identity summary
+- Mention 2 dominant tensions (freedom vs intimacy, logic vs feeling, control vs trust etc.)
+- Keep it concrete (behaviors, patterns), not generic keywords.
+
+1) Big 3: Sun, Moon, Rising
+- For each: 6–10 sentences
+- Include: core need, stress reaction, attachment pattern/social mask, "oh wow" behavior pattern, growth key.
+
+2) Mercury + Venus + Mars
+- For each: 5–8 sentences
+- Include: communication style, conflict pattern, attraction/flirting, motivation trigger, what shuts them down.
+
+3) Houses (if available)
+- Focus: 1st, 7th, 10th, 4th, 2nd, 6th
+- For each: 4–6 sentences
+- Interpret sign + house together; if planet is there, weave it in.
+
+4) Aspects
+- Pick TOP 10 by tightest orb
+- For each: 4–6 sentences
+- Include: psychological dynamic, real-life manifestation, shadow+gift, practical tip.
+
+5) Healing/Karmic points (if available)
+- Node: 5–8 sentences
+- Chiron: 5–8 sentences
+- Lilith: 4–6 sentences

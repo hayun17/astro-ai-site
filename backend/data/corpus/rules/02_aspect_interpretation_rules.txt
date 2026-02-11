@@ -1,0 +1,22 @@
+[TYPE=RULE]
+[KEY=aspect_interpretation_rules]
+
+ASPECT INTERPRETATION RULES
+
+Orb priority:
+- 0°00–1°30 : very loud / defining
+- 1°30–3°30 : strong
+- 3°30–6°00 : noticeable
+- 6°00+     : background unless it repeats as a life theme
+
+Aspect tone:
+- Conjunction: fusion, identity blend, "can't separate"
+- Opposition: push–pull, projection, relational mirror, integration task
+- Square: friction -> growth engine, trigger pattern, pressure -> skill
+- Trine: natural gift, ease, can create complacency
+- Sextile: opportunity; becomes real with small effort
+
+Writing rule:
+- Always describe how it FEELS + how it shows up in real life.
+- Avoid generic lines like "this brings challenges".
+- Use mechanisms (avoidance, intellectualization, impulsivity, withdrawal, over-control, people-pleasing).
