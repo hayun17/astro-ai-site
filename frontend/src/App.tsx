@@ -15,7 +15,7 @@ type Birth = {
 };
 
 const DEFAULT_API_BASE =
-  (import.meta.env.VITE_API_BASE as string) || "http://localhost:8000";
+  (import.meta.env.VITE_API_BASE as string) || "https://astromyla.onrender.com";
 
 export default function App() {
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
