@@ -126,7 +126,7 @@ export default function App() {
     <div className="page">
       <header className="header">
         <div>
-          <h1>Astro MYLA</h1>
+          <h1>AstroMYLA</h1>
           <p className="sub">Natal chart + RAG-grounded interpretation</p>
         </div>
 
