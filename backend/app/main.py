@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .models import BirthData
@@ -15,9 +16,27 @@ from .llm import generate_interpretation
 
 app = FastAPI(title="AstroAI API", version="1.0.0")
 
+# =========================
+# Security / Env
+# =========================
+ENVIRONMENT = os.getenv("ENVIRONMENT", "production").lower()  # "development" | "production"
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN")  # set in Render backend env
+
+# =========================
+# CORS
+# =========================
+if ENVIRONMENT == "development":
+    allowed_origins = ["*"]
+else:
+    # production: only your domains
+    allowed_origins = [
+        "https://astromyla.com",
+        "https://www.astromyla.com",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
@@ -63,8 +82,17 @@ def health():
     return {"ok": True}
 
 
+# 🔒 Admin protected rebuild-index
 @app.post("/api/rebuild-index")
-def rebuild_index_route():
+def rebuild_index_route(x_admin_token: str | None = Header(default=None)):
+    # In production, require token
+    if ENVIRONMENT != "development":
+        if not ADMIN_TOKEN:
+            # safer to fail closed if token not configured
+            raise HTTPException(status_code=500, detail="ADMIN_TOKEN is not configured on server")
+        if x_admin_token != ADMIN_TOKEN:
+            raise HTTPException(status_code=403, detail="Unauthorized")
+
     chunks = build_index()
     return {"chunks": len(chunks)}
 
@@ -135,7 +163,11 @@ def interpret_natal(birth: BirthData):
     q = "natal chart interpretation "
 
     # planet+sign tokens
-    for p in ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto", "TrueNode", "Chiron", "Lilith"]:
+    for p in [
+        "Sun","Moon","Mercury","Venus","Mars",
+        "Jupiter","Saturn","Uranus","Neptune","Pluto",
+        "TrueNode","Chiron","Lilith"
+    ]:
         s = (planets.get(p, {}) or {}).get("sign")
         if s:
             q += f"{p} {s} "
@@ -183,7 +215,9 @@ def interpret_natal(birth: BirthData):
             return
         txt = _find_placement_file(body_folder, str(sign))
         if txt:
-            forced.append({"source": f"FORCED | placements/{body_folder}/{body_folder}_in_{str(sign).lower()}.txt", "text": txt})
+            forced.append(
+                {"source": f"FORCED | placements/{body_folder}/{body_folder}_in_{str(sign).lower()}.txt", "text": txt}
+            )
 
     _force("sun", sun_sign)
     _force("moon", moon_sign)

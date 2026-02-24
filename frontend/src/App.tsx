@@ -14,11 +14,31 @@ type Birth = {
   house_system?: string; // optional
 };
 
-const DEFAULT_API_BASE =
-  (import.meta.env.VITE_API_BASE as string) || "https://astromyla.onrender.com";
+/**
+ * ENV:
+ * - Local: create frontend/.env  -> VITE_API_BASE_URL=http://localhost:8000 (or your backend)
+ * - Render/Prod: set env var in Render -> VITE_API_BASE_URL=https://astromyla.onrender.com
+ *
+ * In production we hide the "API Base" input to keep UI clean & trustworthy.
+ */
+const RAW_ENV_API =
+  (import.meta.env.VITE_API_BASE_URL as string) ||
+  (import.meta.env.VITE_API_BASE as string) || // backward compatibility (senin eski env ismi)
+  "https://astromyla.onrender.com";
+
+function normalizeBase(url: string) {
+  return (url || "").trim().replace(/\/+$/, "");
+}
+
+const DEFAULT_API_BASE = normalizeBase(RAW_ENV_API);
+
+// Vite sets import.meta.env.DEV / PROD flags
+const IS_DEV = import.meta.env.DEV;
 
 export default function App() {
+  // In prod, apiBase is fixed from ENV. In dev, allow override via input.
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
+
   const [birth, setBirth] = useState<Birth>({
     name: "Example",
     year: 2002,
@@ -80,10 +100,12 @@ export default function App() {
     try {
       const payload = {
         ...birth,
-        // şimdilik style/focus backend'e gitmiyor (istersen sonra ekleriz)
+        // TODO: istersen style/focus'u da backend'e ekleriz
       };
 
-      const resp = await fetch(`${apiBase}/api/interpret/natal`, {
+      const base = IS_DEV ? normalizeBase(apiBase) : DEFAULT_API_BASE;
+
+      const resp = await fetch(`${base}/api/interpret/natal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -103,12 +125,19 @@ export default function App() {
     }
   }
 
+  /**
+   * SECURITY NOTE:
+   * "Rebuild index" endpoint should NOT be public in production.
+   * We hide the button in prod. (Backend tarafında da auth koymak en iyisi.)
+   */
   async function rebuildIndex() {
     setLoading(true);
     setError(null);
 
     try {
-      const resp = await fetch(`${apiBase}/api/rebuild-index`, { method: "POST" });
+      const base = IS_DEV ? normalizeBase(apiBase) : DEFAULT_API_BASE;
+
+      const resp = await fetch(`${base}/api/rebuild-index`, { method: "POST" });
       if (!resp.ok) {
         const txt = await resp.text();
         throw new Error(txt || `Request failed (${resp.status})`);
@@ -130,16 +159,19 @@ export default function App() {
           <p className="sub">Natal chart + RAG-grounded interpretation</p>
         </div>
 
-        <div className="api">
-          <label>
-            API Base
-            <input
-              value={apiBase}
-              onChange={(e) => setApiBase(e.target.value)}
-              placeholder="http://localhost:8000"
-            />
-          </label>
-        </div>
+        {/* DEV ONLY: show API Base override */}
+        {IS_DEV && (
+          <div className="api">
+            <label>
+              API Base (dev only)
+              <input
+                value={apiBase}
+                onChange={(e) => setApiBase(e.target.value)}
+                placeholder="http://localhost:8000"
+              />
+            </label>
+          </div>
+        )}
       </header>
 
       {/* TOP: Birth form */}
@@ -262,9 +294,13 @@ export default function App() {
             <button onClick={runInterpretation} disabled={loading}>
               Generate interpretation
             </button>
-            <button onClick={rebuildIndex} disabled={loading} className="secondary">
-              Rebuild corpus index
-            </button>
+
+            {/* DEV ONLY */}
+            {IS_DEV && (
+              <button onClick={rebuildIndex} disabled={loading} className="secondary">
+                Rebuild corpus index (dev only)
+              </button>
+            )}
           </div>
 
           {error && <p className="error">{error}</p>}
@@ -319,8 +355,9 @@ export default function App() {
       <footer className="footer">
         <p>
           Tip: add licensed text under <code>backend/data/corpus</code> then click{" "}
-          “Rebuild corpus index”. Set <code>OPENAI_API_KEY</code> in{" "}
-          <code>backend/.env</code> to enable AI interpretations.
+          <span style={{ fontWeight: 600 }}>“Rebuild corpus index”</span> (dev only).
+          Set <code>OPENAI_API_KEY</code> in <code>backend/.env</code> to enable AI
+          interpretations.
         </p>
       </footer>
     </div>
