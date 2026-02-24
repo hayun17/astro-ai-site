@@ -265,18 +265,15 @@ details summary {
 }
 
 /* =========================================================
-   ✅ NEW: extras under chart (aspect triangle + distributions)
+   ✅ extras under chart (aspect table + distributions)
    ========================================================= */
 
+/* ✅ CHANGED: single column layout (table on top, distributions below) */
 .extras{
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 14px;
   margin-top: 14px;
-}
-
-@media (max-width: 980px){
-  .extras{ grid-template-columns: 1fr; }
 }
 
 /* shared card look */
@@ -298,12 +295,14 @@ details summary {
 
 /* Aspect table */
 .aspectTableWrap{
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   border-radius: 14px;
 }
 
 .aspectTable{
   width: 100%;
+  min-width: 720px;   /* ✅ makes it feel wider and “grow right” */
   border-collapse: collapse;
   font-size: 12px;
 }
@@ -353,6 +352,21 @@ details summary {
   font-size: 11px;
   opacity: 0.75;
 }
+
+/* ✅ NEW: per-aspect color coding (table) */
+.asp { font-weight: 900; }
+
+.asp-conj .aspGlyph { color: #6b5b95; }     /* indigo */
+.asp-sextile .aspGlyph { color: #2aa9a1; }  /* teal */
+.asp-trine .aspGlyph { color: #5aa8ff; }    /* sky blue */
+.asp-square .aspGlyph { color: #ff6aa2; }   /* pink */
+.asp-opp .aspGlyph { color: #ff8a3d; }      /* orange */
+
+.asp-conj { background: rgba(107, 91, 149, 0.10); }
+.asp-sextile { background: rgba(42, 169, 161, 0.10); }
+.asp-trine { background: rgba(90, 168, 255, 0.10); }
+.asp-square { background: rgba(255, 106, 162, 0.10); }
+.asp-opp { background: rgba(255, 138, 61, 0.10); }
 
 /* Distributions */
 .distGrid{

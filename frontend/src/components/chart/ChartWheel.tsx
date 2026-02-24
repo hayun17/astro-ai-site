@@ -73,14 +73,26 @@ type AspectRow = {
   orb: number;
 };
 
+/**
+ * ✅ Per-aspect color mapping (matches Aspect Table palette)
+ */
 function aspectStyle(aspect: string) {
-  const a = aspect.toLowerCase();
-  const harmonious = a === "trine" || a === "sextile";
-  const challenging = a === "square" || a === "opposition";
+  const a = String(aspect || "").toLowerCase();
 
-  if (harmonious) return { stroke: "#ff86b8", width: 2.8, opacity: 0.87 };
-  if (challenging) return { stroke: "#9f7cff", width: 2.8, opacity: 0.87 };
-  return { stroke: "#d8c8ff", width: 2.4, opacity: 0.55 };
+  // Palette:
+  // Conjunction -> indigo
+  // Sextile -> teal
+  // Trine -> sky blue
+  // Square -> pink
+  // Opposition -> orange
+  if (a === "conjunction") return { stroke: "#6b5b95", width: 2.8, opacity: 0.85 };
+  if (a === "sextile")     return { stroke: "#2aa9a1", width: 2.6, opacity: 0.82 };
+  if (a === "trine")       return { stroke: "#5aa8ff", width: 2.8, opacity: 0.85 };
+  if (a === "square")      return { stroke: "#ff6aa2", width: 3.0, opacity: 0.90 };
+  if (a === "opposition")  return { stroke: "#ff8a3d", width: 3.0, opacity: 0.90 };
+
+  // fallback (minor aspects etc.)
+  return { stroke: "#d8c8ff", width: 2.2, opacity: 0.55 };
 }
 
 export default function ChartWheel({ chart }: Props) {
@@ -480,7 +492,7 @@ export default function ChartWheel({ chart }: Props) {
           })}
         </g>
 
-        {/* ✅ FIX: CENTER CIRCLE önce (açıların altında kalmasın diye) */}
+        {/* ✅ FIX: CENTER CIRCLE önce */}
         <g transform={`translate(${CENTER_DX}, ${CENTER_DY})`}>
           <circle
             cx={cx}
@@ -578,7 +590,7 @@ export default function ChartWheel({ chart }: Props) {
           ))}
         </g>
 
-        {/* ✅ FIX: CENTER TEXT en sonda (hep üstte kalsın) */}
+        {/* ✅ FIX: CENTER TEXT en sonda */}
         <g transform={`translate(${CENTER_DX}, ${CENTER_DY})`}>
           <text
             x={cx}
@@ -606,9 +618,10 @@ export default function ChartWheel({ chart }: Props) {
         </g>
       </svg>
 
+      {/* ✅ English legend */}
       <div style={{ marginTop: 10, fontSize: 12, color: "#533a6b" }}>
         <span style={{ opacity: 0.9 }}>
-          Burçlar ♈–♓, gezegenler sembollerle. Açı çizgileri: pembe (uyumlu), mor (zorlayıcı).
+          Signs ♈–♓ and planets are shown with glyphs. Aspect lines are color-coded by aspect type.
         </span>
       </div>
     </div>
