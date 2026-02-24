@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
-import ChartWheel from "./components/chart/ChartWheel.tsx";
-import AspectTriangle from "./components/chart/AspectTriangle.tsx";
-import Distributions from "./components/chart/Distributions.tsx";
+import ChartWheel from "./components/chart/ChartWheel";
+import AspectTriangle from "./components/chart/AspectTriangle";
+import Distributions from "./components/chart/Distributions";
 
 type Birth = {
   name: string;
@@ -13,19 +13,12 @@ type Birth = {
   latitude: number;
   longitude: number;
   tz_offset_hours: number;
-  house_system?: string; // optional
+  house_system?: string;
 };
 
-/**
- * ENV:
- * - Local: create frontend/.env  -> VITE_API_BASE_URL=http://localhost:8000 (or your backend)
- * - Render/Prod: set env var in Render -> VITE_API_BASE_URL=https://astromyla.onrender.com
- *
- * In production we hide the "API Base" input to keep UI clean & trustworthy.
- */
 const RAW_ENV_API =
   (import.meta.env.VITE_API_BASE_URL as string) ||
-  (import.meta.env.VITE_API_BASE as string) || // backward compatibility (senin eski env ismi)
+  (import.meta.env.VITE_API_BASE as string) ||
   "https://astromyla.onrender.com";
 
 function normalizeBase(url: string) {
@@ -33,12 +26,9 @@ function normalizeBase(url: string) {
 }
 
 const DEFAULT_API_BASE = normalizeBase(RAW_ENV_API);
-
-// Vite sets import.meta.env.DEV / PROD flags
 const IS_DEV = import.meta.env.DEV;
 
 export default function App() {
-  // In prod, apiBase is fixed from ENV. In dev, allow override via input.
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
 
   const [birth, setBirth] = useState<Birth>({
@@ -59,13 +49,16 @@ export default function App() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // result shape: { chart, interpretation, retrieval }
   const [result, setResult] = useState<any>(null);
+
+  const baseUrl = useMemo(() => {
+    return IS_DEV ? normalizeBase(apiBase) : DEFAULT_API_BASE;
+  }, [apiBase]);
 
   const planetsSummary = useMemo(() => {
     const planets = result?.chart?.planets;
     if (!planets) return null;
+
     const keys = [
       "Sun",
       "Moon",
@@ -89,13 +82,13 @@ export default function App() {
       .join(" • ");
   }, [result]);
 
-  const chartForWheel = useMemo(() => {
-    // ChartWheel expects backend chart JSON
-    return result?.chart ?? null;
-  }, [result]);
+  const chartForWheel = useMemo(() => result?.chart ?? null, [result]);
 
-  const planetAspects = useMemo(() => {
-    return result?.chart?.aspects?.planet_aspects ?? [];
+  // ✅ Merge planet aspects + other aspects (ASC/MC/Node/Lilith/Chiron etc)
+  const allAspects = useMemo(() => {
+    const pa = result?.chart?.aspects?.planet_aspects ?? [];
+    const oa = result?.chart?.aspects?.other_aspects ?? [];
+    return [...pa, ...oa];
   }, [result]);
 
   async function runInterpretation() {
@@ -104,14 +97,9 @@ export default function App() {
     setResult(null);
 
     try {
-      const payload = {
-        ...birth,
-        // TODO: istersen style/focus'u da backend'e ekleriz
-      };
+      const payload = { ...birth };
 
-      const base = IS_DEV ? normalizeBase(apiBase) : DEFAULT_API_BASE;
-
-      const resp = await fetch(`${base}/api/interpret/natal`, {
+      const resp = await fetch(`${baseUrl}/api/interpret/natal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -125,8 +113,8 @@ export default function App() {
       const data = await resp.json();
       setResult(data);
 
-      // If you want the chart JSON easily:
-      // console.log("CHART JSON:", data?.chart);
+      // DEV: easy debug
+      if (IS_DEV) console.log("CHART JSON:", data?.chart);
     } catch (e: any) {
       setError(e?.message || "Unknown error");
     } finally {
@@ -134,19 +122,12 @@ export default function App() {
     }
   }
 
-  /**
-   * SECURITY NOTE:
-   * "Rebuild index" endpoint should NOT be public in production.
-   * We hide the button in prod. (Backend tarafında da auth koymak en iyisi.)
-   */
   async function rebuildIndex() {
     setLoading(true);
     setError(null);
 
     try {
-      const base = IS_DEV ? normalizeBase(apiBase) : DEFAULT_API_BASE;
-
-      const resp = await fetch(`${base}/api/rebuild-index`, { method: "POST" });
+      const resp = await fetch(`${baseUrl}/api/rebuild-index`, { method: "POST" });
       if (!resp.ok) {
         const txt = await resp.text();
         throw new Error(txt || `Request failed (${resp.status})`);
@@ -165,12 +146,9 @@ export default function App() {
       <header className="header">
         <div>
           <h1>AstroMYLA</h1>
-
-          {/* ✅ 1) CHANGE THIS TEXT (SEO / CTR) */}
           <p className="sub">AI Birth Chart + Source-Backed Interpretation</p>
         </div>
 
-        {/* DEV ONLY: show API Base override */}
         {IS_DEV && (
           <div className="api">
             <label>
@@ -185,9 +163,9 @@ export default function App() {
         )}
       </header>
 
-      {/* TOP: Birth form */}
+      {/* Form */}
       <section className="card">
-        <h2>Enter your birth datas babe :)</h2>
+        <h2>Enter your birth data ✨</h2>
 
         <div className="form">
           <label>
@@ -206,9 +184,7 @@ export default function App() {
                   birth.day
                 ).padStart(2, "0")}`}
                 onChange={(e) => {
-                  const [y, m, d] = e.target.value
-                    .split("-")
-                    .map((n) => parseInt(n, 10));
+                  const [y, m, d] = e.target.value.split("-").map((n) => parseInt(n, 10));
                   if (y && m && d) setBirth({ ...birth, year: y, month: m, day: d });
                 }}
               />
@@ -222,9 +198,7 @@ export default function App() {
                   "0"
                 )}`}
                 onChange={(e) => {
-                  const [hh, mm] = e.target.value
-                    .split(":")
-                    .map((n) => parseInt(n, 10));
+                  const [hh, mm] = e.target.value.split(":").map((n) => parseInt(n, 10));
                   if (Number.isFinite(hh) && Number.isFinite(mm))
                     setBirth({ ...birth, hour: hh, minute: mm });
                 }}
@@ -239,9 +213,7 @@ export default function App() {
                 type="number"
                 step="0.0001"
                 value={birth.latitude}
-                onChange={(e) =>
-                  setBirth({ ...birth, latitude: parseFloat(e.target.value) })
-                }
+                onChange={(e) => setBirth({ ...birth, latitude: parseFloat(e.target.value) })}
               />
             </label>
 
@@ -251,9 +223,7 @@ export default function App() {
                 type="number"
                 step="0.0001"
                 value={birth.longitude}
-                onChange={(e) =>
-                  setBirth({ ...birth, longitude: parseFloat(e.target.value) })
-                }
+                onChange={(e) => setBirth({ ...birth, longitude: parseFloat(e.target.value) })}
               />
             </label>
 
@@ -275,9 +245,7 @@ export default function App() {
               House system
               <input
                 value={birth.house_system || "P"}
-                onChange={(e) =>
-                  setBirth({ ...birth, house_system: e.target.value || "P" })
-                }
+                onChange={(e) => setBirth({ ...birth, house_system: e.target.value || "P" })}
                 placeholder="P (Placidus), W (Whole Sign), K (Koch) ..."
               />
             </label>
@@ -296,7 +264,7 @@ export default function App() {
               <input
                 value={focus}
                 onChange={(e) => setFocus(e.target.value)}
-                placeholder="career / relationships / 2026 themes"
+                placeholder="career / relationships / yearly themes"
               />
             </label>
           </div>
@@ -306,7 +274,6 @@ export default function App() {
               Generate interpretation
             </button>
 
-            {/* DEV ONLY */}
             {IS_DEV && (
               <button onClick={rebuildIndex} disabled={loading} className="secondary">
                 Rebuild corpus index (dev only)
@@ -319,62 +286,56 @@ export default function App() {
         </div>
       </section>
 
-      {/* BOTTOM: LEFT chart, RIGHT interpretation */}
-      <div className="grid2">
-        <section className="card">
-          <h2>Your Special Chart :)</h2>
+      {/* Chart (centered, big) */}
+      <section className="card chartCard">
+        <div className="chartHeader">
+          <h2>Your Chart ✨</h2>
+          {result && <div className="pill">{planetsSummary}</div>}
+        </div>
 
-          {!result && <p className="muted">Generate interpretation to render the chart.</p>}
+        {!result && <p className="muted">Generate interpretation to render the chart.</p>}
 
-          {result && (
-            <>
-              <div className="pill">{planetsSummary}</div>
+        {result && (
+          <div className="chartBox">
+            {chartForWheel ? <ChartWheel chart={chartForWheel} /> : <p>No chart data found.</p>}
+          </div>
+        )}
+      </section>
 
-              <div className="chartBox">
-                {chartForWheel ? (
-                  <ChartWheel chart={chartForWheel} />
-                ) : (
-                  <p className="muted">No chart data found.</p>
-                )}
-              </div>
+      {/* Below chart: Interpretation (wide) + Extras (right) */}
+      {result && (
+        <div className="belowGrid">
+          <section className="card">
+            <h2>Interpretation</h2>
+            <pre className="output">{result.interpretation}</pre>
 
-              {/* ✅ 3) NEW: aspect triangle + distributions */}
-              <div className="extras">
-                <AspectTriangle aspects={planetAspects} />
-                <Distributions planets={result?.chart?.planets} />
-              </div>
-            </>
-          )}
-        </section>
+            {/* ✅ Hidden in production */}
+            {IS_DEV && (
+              <details>
+                <summary>DEV: Retrieval (RAG) sources</summary>
+                <pre className="output">{JSON.stringify(result.retrieval, null, 2)}</pre>
+              </details>
+            )}
 
-        <section className="card">
-          <h2> Your Interpretations HERE !!! </h2>
-          {!result && <p className="muted">Run an interpretation to see outputs.</p>}
+            {IS_DEV && (
+              <details>
+                <summary>DEV: Chart JSON</summary>
+                <pre className="output">{JSON.stringify(result.chart, null, 2)}</pre>
+              </details>
+            )}
+          </section>
 
-          {result && (
-            <>
-              <pre className="output">{result.interpretation}</pre>
+          <section className="card">
+            <h2>Aspects & Distributions</h2>
 
-              {/* ✅ DEV ONLY: hide debug info from real users */}
-              {IS_DEV && (
-                <>
-                  <details>
-                    <summary>Retrieval (RAG) sources</summary>
-                    <pre className="output">{JSON.stringify(result.retrieval, null, 2)}</pre>
-                  </details>
+            <div className="extrasStack">
+              <AspectTriangle aspects={allAspects} />
+              <Distributions planets={result?.chart?.planets} />
+            </div>
+          </section>
+        </div>
+      )}
 
-                  <details>
-                    <summary>Chart JSON</summary>
-                    <pre className="output">{JSON.stringify(result.chart, null, 2)}</pre>
-                  </details>
-                </>
-              )}
-            </>
-          )}
-        </section>
-      </div>
-
-      {/* ✅ 2) REMOVED that big dev tip footer */}
       <footer className="footer">
         <p>© {new Date().getFullYear()} AstroMYLA</p>
       </footer>

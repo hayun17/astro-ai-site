@@ -3,7 +3,7 @@ import "./chartStyles.css";
 import ChartBackground from "./ChartBackground.png";
 
 type Props = {
-  chart: any; // backend chart json
+  chart: any;
 };
 
 const SIGNS = [
@@ -73,26 +73,18 @@ type AspectRow = {
   orb: number;
 };
 
-/**
- * ✅ Per-aspect color mapping (matches Aspect Table palette)
- */
 function aspectStyle(aspect: string) {
-  const a = String(aspect || "").toLowerCase();
+  const a = (aspect || "").toLowerCase();
 
-  // Palette:
-  // Conjunction -> indigo
-  // Sextile -> teal
-  // Trine -> sky blue
-  // Square -> pink
-  // Opposition -> orange
-  if (a === "conjunction") return { stroke: "#6b5b95", width: 2.8, opacity: 0.85 };
-  if (a === "sextile")     return { stroke: "#2aa9a1", width: 2.6, opacity: 0.82 };
-  if (a === "trine")       return { stroke: "#5aa8ff", width: 2.8, opacity: 0.85 };
-  if (a === "square")      return { stroke: "#ff6aa2", width: 3.0, opacity: 0.90 };
-  if (a === "opposition")  return { stroke: "#ff8a3d", width: 3.0, opacity: 0.90 };
+  // ✅ distinct colors per aspect (fits your palette)
+  if (a === "conjunction") return { stroke: "#ff5aa6", width: 3.0, opacity: 0.92 };
+  if (a === "sextile")     return { stroke: "#18c6c6", width: 2.8, opacity: 0.90 };
+  if (a === "trine")       return { stroke: "#2f7cff", width: 2.8, opacity: 0.90 };
+  if (a === "square")      return { stroke: "#8d5bff", width: 2.9, opacity: 0.90 };
+  if (a === "opposition")  return { stroke: "#ff8a3d", width: 3.0, opacity: 0.92 };
 
-  // fallback (minor aspects etc.)
-  return { stroke: "#d8c8ff", width: 2.2, opacity: 0.55 };
+  // fallback
+  return { stroke: "#d8c8ff", width: 2.3, opacity: 0.55 };
 }
 
 export default function ChartWheel({ chart }: Props) {
@@ -133,7 +125,6 @@ export default function ChartWheel({ chart }: Props) {
   const cx = size / 2;
   const cy = size / 2;
 
-  // ✅ senin bulduğun hizalama
   const R_OUT = 292;
   const R_SIGN_IN = 262;
 
@@ -145,20 +136,15 @@ export default function ChartWheel({ chart }: Props) {
   const BG_PAD = 36;
   const BG_OPACITY = 0.95;
 
-  /**
-   * ✅ KATMAN KATMAN OFFSET SİSTEMİ
-   * Her şeyi ayrı ayrı oynat.
-   */
-  const OUTER_DX = 7, OUTER_DY = 0;     // en dış çember
-  const SIGN_DX  = 8, SIGN_DY  = 4;     // 2. ring + sign lines + sign labels
-  const HOUSE_DX = 0, HOUSE_DY = 0;     // house çizgileri + numaralar
-  const GUIDE_DX = 0, GUIDE_DY = 0;     // guide circle (aspect guide vs)
-  const ASPECT_DX = 0, ASPECT_DY = 0;   // açı çizgileri (planet ile senkronlanacak)
-  const ASC_DX = 0, ASC_DY = 0;         // ASC çizgisi/yazısı
-  const PLANET_DX = 0, PLANET_DY = 0;   // gezegenler + degree label
-  const CENTER_DX = 0, CENTER_DY = 0;   // center circle + title
+  const OUTER_DX = 7, OUTER_DY = 0;
+  const SIGN_DX  = 8, SIGN_DY  = 4;
+  const HOUSE_DX = 0, HOUSE_DY = 0;
+  const GUIDE_DX = 0, GUIDE_DY = 0;
+  const ASPECT_DX = 0, ASPECT_DY = 0;
+  const ASC_DX = 0, ASC_DY = 0;
+  const PLANET_DX = 0, PLANET_DY = 0;
+  const CENTER_DX = 0, CENTER_DY = 0;
 
-  // ✅ görünürlük/kontrast arttırılmış palette
   const theme = {
     stroke1: "#bfa6ff",
     stroke2: "#b79dff",
@@ -170,7 +156,6 @@ export default function ChartWheel({ chart }: Props) {
     houseNumber: "#3e2158",
   };
 
-  // ✅ house numaraları için ayar (okunurluk)
   const HOUSE_NUM_FONT = 12.5;
   const HOUSE_NUM_WEIGHT: React.CSSProperties["fontWeight"] = 800;
   const HOUSE_NUM_OPACITY = 1;
@@ -180,7 +165,6 @@ export default function ChartWheel({ chart }: Props) {
   const HOUSE_NUM_BG_STROKE = "rgba(191,166,255,0.55)";
   const HOUSE_NUM_BG_STROKE_W = 1;
 
-  // ✅ sign ring stroke (house çizgilerini burada bitiriyorduk)
   const SIGN_RING_STROKE = 10;
   const HOUSE_END_R = R_SIGN_IN + SIGN_RING_STROKE / 2 - 1;
 
@@ -271,7 +255,6 @@ export default function ChartWheel({ chart }: Props) {
     return map;
   }, [planetPoints]);
 
-  // ✅ AÇI ÇİZGİLERİ: içte kalması için güvenli radius (center'dan küçük)
   const R_ASPECT_DRAW = Math.min(R_ASPECT, R_CENTER - 10);
 
   const aspectLines = useMemo(() => {
@@ -281,12 +264,17 @@ export default function ChartWheel({ chart }: Props) {
       stroke: string; width: number; opacity: number;
     }> = [];
 
-    const maxOrb = 6.0;
-    const maxLines = 30;
+    // ✅ show more lines + allow a bit more orb so outer planets also appear
+    const maxOrb = 8.0;
+    const maxLines = 90;
 
     const planetAs: AspectRow[] = Array.isArray(aspects?.planet_aspects) ? aspects.planet_aspects : [];
     const otherAs: AspectRow[] = Array.isArray(aspects?.other_aspects) ? aspects.other_aspects : [];
-    const merged = [...planetAs, ...otherAs];
+
+    // keep best ones early (they are already sorted by orb in backend, but we merge + sort again safely)
+    const merged = [...planetAs, ...otherAs]
+      .filter(a => a && typeof a.orb === "number")
+      .sort((a, b) => (a.orb ?? 999) - (b.orb ?? 999));
 
     const seen = new Set<string>();
 
@@ -306,7 +294,6 @@ export default function ChartWheel({ chart }: Props) {
       const d1 = wrap360(p1.lon + rot);
       const d2 = wrap360(p2.lon + rot);
 
-      // ✅ iç çemberde çiz
       const q1 = polar(cx, cy, R_ASPECT_DRAW, d1);
       const q2 = polar(cx, cy, R_ASPECT_DRAW, d2);
 
@@ -380,7 +367,7 @@ export default function ChartWheel({ chart }: Props) {
           <rect x={0} y={0} width={size} height={size} fill="url(#bgTint)" />
         </g>
 
-        {/* OUTER ring (separate move) */}
+        {/* OUTER ring */}
         <g transform={`translate(${OUTER_DX}, ${OUTER_DY})`}>
           <circle
             cx={cx}
@@ -393,7 +380,7 @@ export default function ChartWheel({ chart }: Props) {
           />
         </g>
 
-        {/* SIGN system (2nd ring + sign lines + sign labels) */}
+        {/* SIGN system */}
         <g transform={`translate(${SIGN_DX}, ${SIGN_DY})`}>
           <circle
             cx={cx}
@@ -401,7 +388,7 @@ export default function ChartWheel({ chart }: Props) {
             r={R_SIGN_IN}
             fill="rgba(245,241,255,0.14)"
             stroke={theme.stroke2}
-            strokeWidth={SIGN_RING_STROKE}
+            strokeWidth={10}
             opacity={0.98}
           />
 
@@ -435,7 +422,7 @@ export default function ChartWheel({ chart }: Props) {
           ))}
         </g>
 
-        {/* GUIDE ring(s) like aspect guide circle */}
+        {/* GUIDE ring */}
         <g transform={`translate(${GUIDE_DX}, ${GUIDE_DY})`}>
           <circle
             cx={cx}
@@ -492,7 +479,7 @@ export default function ChartWheel({ chart }: Props) {
           })}
         </g>
 
-        {/* ✅ FIX: CENTER CIRCLE önce */}
+        {/* center circle */}
         <g transform={`translate(${CENTER_DX}, ${CENTER_DY})`}>
           <circle
             cx={cx}
@@ -505,7 +492,7 @@ export default function ChartWheel({ chart }: Props) {
           />
         </g>
 
-        {/* ✅ FIX: ASPECT lines gezegenlerle senkron translate */}
+        {/* aspect lines */}
         <g transform={`translate(${PLANET_DX + ASPECT_DX}, ${PLANET_DY + ASPECT_DY})`}>
           {aspectLines.map((a) => (
             <line
@@ -590,7 +577,7 @@ export default function ChartWheel({ chart }: Props) {
           ))}
         </g>
 
-        {/* ✅ FIX: CENTER TEXT en sonda */}
+        {/* center text */}
         <g transform={`translate(${CENTER_DX}, ${CENTER_DY})`}>
           <text
             x={cx}
@@ -618,10 +605,10 @@ export default function ChartWheel({ chart }: Props) {
         </g>
       </svg>
 
-      {/* ✅ English legend */}
+      {/* ✅ English explanation */}
       <div style={{ marginTop: 10, fontSize: 12, color: "#533a6b" }}>
         <span style={{ opacity: 0.9 }}>
-          Signs ♈–♓ and planets are shown with glyphs. Aspect lines are color-coded by aspect type.
+          Signs are shown as ♈–♓ and planets as glyphs. Aspect lines use distinct colors for each aspect type.
         </span>
       </div>
     </div>

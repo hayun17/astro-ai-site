@@ -20,6 +20,9 @@ const PLANETS = [
   "Pluto",
 ];
 
+// (Optional) If backend later includes these in planet aspects, you can enable:
+// const EXTRA_POINTS = ["Asc", "MC", "North Node", "Chiron"];
+
 const ASPECT_GLYPH: Record<string, string> = {
   Conjunction: "☌",
   Opposition: "☍",
@@ -30,6 +33,23 @@ const ASPECT_GLYPH: Record<string, string> = {
 
 function key(a: string, b: string) {
   return [a, b].sort().join("__");
+}
+
+function aspectClass(name?: string) {
+  switch (name) {
+    case "Conjunction":
+      return "asp asp-conj";
+    case "Opposition":
+      return "asp asp-opp";
+    case "Trine":
+      return "asp asp-trine";
+    case "Square":
+      return "asp asp-square";
+    case "Sextile":
+      return "asp asp-sextile";
+    default:
+      return "asp asp-other";
+  }
 }
 
 export default function AspectTriangle({ aspects }: { aspects: AspectItem[] }) {
@@ -74,7 +94,7 @@ export default function AspectTriangle({ aspects }: { aspects: AspectItem[] }) {
                   const orb = Number.isFinite(a.orb) ? a.orb : 0;
 
                   return (
-                    <td key={colP} className="cell">
+                    <td key={colP} className={`cell ${aspectClass(a.aspect)}`}>
                       <div className="aspGlyph">{glyph}</div>
                       <div className="aspOrb">{orb.toFixed(1)}°</div>
                     </td>
