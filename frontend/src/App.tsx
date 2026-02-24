@@ -355,15 +355,20 @@ export default function App() {
             <>
               <pre className="output">{result.interpretation}</pre>
 
-              <details>
-                <summary>Retrieval (RAG) sources</summary>
-                <pre className="output">{JSON.stringify(result.retrieval, null, 2)}</pre>
-              </details>
+              {/* ✅ DEV ONLY: hide debug info from real users */}
+              {IS_DEV && (
+                <>
+                  <details>
+                    <summary>Retrieval (RAG) sources</summary>
+                    <pre className="output">{JSON.stringify(result.retrieval, null, 2)}</pre>
+                  </details>
 
-              <details>
-                <summary>Chart JSON</summary>
-                <pre className="output">{JSON.stringify(result.chart, null, 2)}</pre>
-              </details>
+                  <details>
+                    <summary>Chart JSON</summary>
+                    <pre className="output">{JSON.stringify(result.chart, null, 2)}</pre>
+                  </details>
+                </>
+              )}
             </>
           )}
         </section>
