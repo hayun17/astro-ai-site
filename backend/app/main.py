@@ -78,12 +78,11 @@ def _find_placement_file(body: str, sign: str) -> str | None:
 
 @app.get("/api/health")
 def health():
-    # Bu endpoint ile deploy doğru mu anlayabilirsin
     return {
         "ok": True,
         "environment": ENVIRONMENT,
-        "cors_allow_origins": allowed_origins,
         "admin_token_configured": bool(ADMIN_TOKEN),
+        "cors_allow_origins": allowed_origins,
     }
 
 

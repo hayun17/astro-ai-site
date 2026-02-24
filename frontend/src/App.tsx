@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
 import ChartWheel from "./components/chart/ChartWheel.tsx";
+import AspectTriangle from "./components/chart/AspectTriangle.tsx";
+import Distributions from "./components/chart/Distributions.tsx";
 
 type Birth = {
   name: string;
@@ -92,6 +94,10 @@ export default function App() {
     return result?.chart ?? null;
   }, [result]);
 
+  const planetAspects = useMemo(() => {
+    return result?.chart?.aspects?.planet_aspects ?? [];
+  }, [result]);
+
   async function runInterpretation() {
     setLoading(true);
     setError(null);
@@ -118,6 +124,9 @@ export default function App() {
 
       const data = await resp.json();
       setResult(data);
+
+      // If you want the chart JSON easily:
+      // console.log("CHART JSON:", data?.chart);
     } catch (e: any) {
       setError(e?.message || "Unknown error");
     } finally {
@@ -156,7 +165,9 @@ export default function App() {
       <header className="header">
         <div>
           <h1>AstroMYLA</h1>
-          <p className="sub">Natal chart + RAG-grounded interpretation</p>
+
+          {/* ✅ 1) CHANGE THIS TEXT (SEO / CTR) */}
+          <p className="sub">AI Birth Chart + Source-Backed Interpretation</p>
         </div>
 
         {/* DEV ONLY: show API Base override */}
@@ -326,6 +337,12 @@ export default function App() {
                   <p className="muted">No chart data found.</p>
                 )}
               </div>
+
+              {/* ✅ 3) NEW: aspect triangle + distributions */}
+              <div className="extras">
+                <AspectTriangle aspects={planetAspects} />
+                <Distributions planets={result?.chart?.planets} />
+              </div>
             </>
           )}
         </section>
@@ -352,13 +369,9 @@ export default function App() {
         </section>
       </div>
 
+      {/* ✅ 2) REMOVED that big dev tip footer */}
       <footer className="footer">
-        <p>
-          Tip: add licensed text under <code>backend/data/corpus</code> then click{" "}
-          <span style={{ fontWeight: 600 }}>“Rebuild corpus index”</span> (dev only).
-          Set <code>OPENAI_API_KEY</code> in <code>backend/.env</code> to enable AI
-          interpretations.
-        </p>
+        <p>© {new Date().getFullYear()} AstroMYLA</p>
       </footer>
     </div>
   );
