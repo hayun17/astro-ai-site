@@ -28,7 +28,6 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN")  # set in Render backend env
 if ENVIRONMENT == "development":
     allowed_origins = ["*"]
 else:
-    # production: only your domains
     allowed_origins = [
         "https://astromyla.com",
         "https://www.astromyla.com",
@@ -79,16 +78,21 @@ def _find_placement_file(body: str, sign: str) -> str | None:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True}
+    # Bu endpoint ile deploy doğru mu anlayabilirsin
+    return {
+        "ok": True,
+        "environment": ENVIRONMENT,
+        "cors_allow_origins": allowed_origins,
+        "admin_token_configured": bool(ADMIN_TOKEN),
+    }
 
 
 # 🔒 Admin protected rebuild-index
 @app.post("/api/rebuild-index")
-def rebuild_index_route(x_admin_token: str | None = Header(default=None)):
+def rebuild_index_route(x_admin_token: str | None = Header(default=None, alias="X-Admin-Token")):
     # In production, require token
     if ENVIRONMENT != "development":
         if not ADMIN_TOKEN:
-            # safer to fail closed if token not configured
             raise HTTPException(status_code=500, detail="ADMIN_TOKEN is not configured on server")
         if x_admin_token != ADMIN_TOKEN:
             raise HTTPException(status_code=403, detail="Unauthorized")
@@ -229,7 +233,6 @@ def interpret_natal(birth: BirthData):
     _force("true_node", true_node_sign)
     _force("lilith", lilith_sign)
 
-    # (Vertex/Fortune are points, only force if you actually created those folders/files)
     _force("vertex", vertex_sign)
     _force("fortune", fortune_sign)
 
