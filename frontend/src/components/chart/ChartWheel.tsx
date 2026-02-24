@@ -76,15 +76,16 @@ type AspectRow = {
 function aspectStyle(aspect: string) {
   const a = (aspect || "").toLowerCase();
 
-  // ✅ distinct colors per aspect (fits your palette)
-  if (a === "conjunction") return { stroke: "#ff5aa6", width: 3.0, opacity: 0.92 };
-  if (a === "sextile")     return { stroke: "#18c6c6", width: 2.8, opacity: 0.90 };
-  if (a === "trine")       return { stroke: "#2f7cff", width: 2.8, opacity: 0.90 };
-  if (a === "square")      return { stroke: "#8d5bff", width: 2.9, opacity: 0.90 };
-  if (a === "opposition")  return { stroke: "#ff8a3d", width: 3.0, opacity: 0.92 };
+  // Distinct colors per aspect type (easier to read)
+  // These are pastel-friendly but clearly different.
+  if (a === "conjunction" || a === "conj") return { stroke: "#ff5fa2", width: 3.0, opacity: 0.90 };
+  if (a === "sextile") return { stroke: "#20c997", width: 2.8, opacity: 0.86 };
+  if (a === "trine") return { stroke: "#4dabf7", width: 2.8, opacity: 0.86 };
+  if (a === "square") return { stroke: "#ff922b", width: 3.0, opacity: 0.90 };
+  if (a === "opposition" || a === "opp") return { stroke: "#845ef7", width: 3.0, opacity: 0.90 };
 
-  // fallback
-  return { stroke: "#d8c8ff", width: 2.3, opacity: 0.55 };
+  // minor aspects
+  return { stroke: "#d8c8ff", width: 2.2, opacity: 0.55 };
 }
 
 export default function ChartWheel({ chart }: Props) {
@@ -264,17 +265,13 @@ export default function ChartWheel({ chart }: Props) {
       stroke: string; width: number; opacity: number;
     }> = [];
 
-    // ✅ show more lines + allow a bit more orb so outer planets also appear
+    // ✅ allow more aspects (this helps outer-planet aspects show up if backend provides them)
     const maxOrb = 8.0;
-    const maxLines = 90;
+    const maxLines = 120;
 
     const planetAs: AspectRow[] = Array.isArray(aspects?.planet_aspects) ? aspects.planet_aspects : [];
     const otherAs: AspectRow[] = Array.isArray(aspects?.other_aspects) ? aspects.other_aspects : [];
-
-    // keep best ones early (they are already sorted by orb in backend, but we merge + sort again safely)
-    const merged = [...planetAs, ...otherAs]
-      .filter(a => a && typeof a.orb === "number")
-      .sort((a, b) => (a.orb ?? 999) - (b.orb ?? 999));
+    const merged = [...planetAs, ...otherAs];
 
     const seen = new Set<string>();
 
@@ -380,7 +377,7 @@ export default function ChartWheel({ chart }: Props) {
           />
         </g>
 
-        {/* SIGN system */}
+        {/* SIGN ring + sign lines + sign labels */}
         <g transform={`translate(${SIGN_DX}, ${SIGN_DY})`}>
           <circle
             cx={cx}
@@ -388,7 +385,7 @@ export default function ChartWheel({ chart }: Props) {
             r={R_SIGN_IN}
             fill="rgba(245,241,255,0.14)"
             stroke={theme.stroke2}
-            strokeWidth={10}
+            strokeWidth={SIGN_RING_STROKE}
             opacity={0.98}
           />
 
@@ -479,7 +476,7 @@ export default function ChartWheel({ chart }: Props) {
           })}
         </g>
 
-        {/* center circle */}
+        {/* CENTER circle */}
         <g transform={`translate(${CENTER_DX}, ${CENTER_DY})`}>
           <circle
             cx={cx}
@@ -492,7 +489,7 @@ export default function ChartWheel({ chart }: Props) {
           />
         </g>
 
-        {/* aspect lines */}
+        {/* ASPECT lines */}
         <g transform={`translate(${PLANET_DX + ASPECT_DX}, ${PLANET_DY + ASPECT_DY})`}>
           {aspectLines.map((a) => (
             <line
@@ -518,7 +515,7 @@ export default function ChartWheel({ chart }: Props) {
                 y1={ascLine.p1.y}
                 x2={ascLine.p2.x}
                 y2={ascLine.p2.y}
-                stroke="#ff7fb8"
+                stroke="#ff5fa2"
                 strokeWidth={3.2}
                 opacity={0.95}
               />
@@ -528,7 +525,7 @@ export default function ChartWheel({ chart }: Props) {
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontSize="12"
-                fill="#ff5aa6"
+                fill="#ff5fa2"
                 fontFamily="ui-sans-serif, system-ui"
               >
                 ASC
@@ -577,7 +574,7 @@ export default function ChartWheel({ chart }: Props) {
           ))}
         </g>
 
-        {/* center text */}
+        {/* CENTER TEXT */}
         <g transform={`translate(${CENTER_DX}, ${CENTER_DY})`}>
           <text
             x={cx}
@@ -605,10 +602,9 @@ export default function ChartWheel({ chart }: Props) {
         </g>
       </svg>
 
-      {/* ✅ English explanation */}
       <div style={{ marginTop: 10, fontSize: 12, color: "#533a6b" }}>
         <span style={{ opacity: 0.9 }}>
-          Signs are shown as ♈–♓ and planets as glyphs. Aspect lines use distinct colors for each aspect type.
+          Signs ♈–♓ and planets use symbols. Aspect lines are color-coded by aspect type (e.g., square ≠ opposition).
         </span>
       </div>
     </div>

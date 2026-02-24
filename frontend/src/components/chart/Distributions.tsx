@@ -1,26 +1,10 @@
 import React, { useMemo } from "react";
 
-type Planet = {
-  sign?: string;
-  available?: boolean;
+type Props = {
+  planets: any; // chart.planets object
 };
 
-type PlanetsDict = Record<string, Planet>;
-
-const MAJOR = [
-  "Sun",
-  "Moon",
-  "Mercury",
-  "Venus",
-  "Mars",
-  "Jupiter",
-  "Saturn",
-  "Uranus",
-  "Neptune",
-  "Pluto",
-];
-
-const ELEMENTS: Record<string, "Fire" | "Earth" | "Air" | "Water"> = {
+const ELEMENT_BY_SIGN: Record<string, "Fire" | "Earth" | "Air" | "Water"> = {
   Aries: "Fire",
   Leo: "Fire",
   Sagittarius: "Fire",
@@ -35,7 +19,7 @@ const ELEMENTS: Record<string, "Fire" | "Earth" | "Air" | "Water"> = {
   Pisces: "Water",
 };
 
-const MODALITIES: Record<string, "Cardinal" | "Fixed" | "Mutable"> = {
+const MODALITY_BY_SIGN: Record<string, "Cardinal" | "Fixed" | "Mutable"> = {
   Aries: "Cardinal",
   Cancer: "Cardinal",
   Libra: "Cardinal",
@@ -50,38 +34,33 @@ const MODALITIES: Record<string, "Cardinal" | "Fixed" | "Mutable"> = {
   Pisces: "Mutable",
 };
 
-function pct(n: number, total: number) {
-  if (!total) return "0%";
-  return `${Math.round((n / total) * 100)}%`;
-}
+const MAJORS = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto"];
 
-export default function Distributions({ planets }: { planets?: PlanetsDict }) {
-  const { elementCount, modalityCount, total } = useMemo(() => {
-    const e: Record<string, number> = { Fire: 0, Earth: 0, Air: 0, Water: 0 };
-    const m: Record<string, number> = { Cardinal: 0, Fixed: 0, Mutable: 0 };
+export default function Distributions({ planets }: Props) {
+  const { elements, modalities, counted } = useMemo(() => {
+    const el: Record<string, number> = { Fire: 0, Earth: 0, Air: 0, Water: 0 };
+    const mo: Record<string, number> = { Cardinal: 0, Fixed: 0, Mutable: 0 };
+    let n = 0;
 
-    if (!planets) return { elementCount: e, modalityCount: m, total: 0 };
+    for (const k of MAJORS) {
+      const p = planets?.[k];
+      const sign = p?.sign;
+      if (!sign) continue;
 
-    let t = 0;
-
-    for (const name of MAJOR) {
-      const p = planets[name];
-      if (!p?.sign) continue;
-      if (p.available === false) continue;
-
-      const el = ELEMENTS[p.sign];
-      const mo = MODALITIES[p.sign];
-      if (!el || !mo) continue;
-
-      e[el] += 1;
-      m[mo] += 1;
-      t += 1;
+      const e = ELEMENT_BY_SIGN[sign];
+      const m = MODALITY_BY_SIGN[sign];
+      if (e) el[e] += 1;
+      if (m) mo[m] += 1;
+      n += 1;
     }
 
-    return { elementCount: e, modalityCount: m, total: t };
+    return { elements: el, modalities: mo, counted: n };
   }, [planets]);
 
-  if (!planets) return null;
+  const pct = (x: number) => {
+    if (!counted) return "0%";
+    return `${Math.round((x / counted) * 100)}%`;
+  };
 
   return (
     <div className="distCard">
@@ -90,30 +69,29 @@ export default function Distributions({ planets }: { planets?: PlanetsDict }) {
       <div className="distGrid">
         <div className="distBlock">
           <div className="distHead">Elements</div>
-          {(["Fire", "Earth", "Air", "Water"] as const).map((k) => (
-            <div key={k} className="distRow">
-              <span className="distKey">{k}</span>
-              <span className="distVal">
-                {elementCount[k]} <span className="distPct">{pct(elementCount[k], total)}</span>
-              </span>
+          {Object.entries(elements).map(([k, v]) => (
+            <div className="distRow" key={k}>
+              <div className="distKey">{k}</div>
+              <div className="distVal">
+                {v} <span className="distPct">{pct(v)}</span>
+              </div>
             </div>
           ))}
         </div>
 
         <div className="distBlock">
           <div className="distHead">Modalities</div>
-          {(["Cardinal", "Fixed", "Mutable"] as const).map((k) => (
-            <div key={k} className="distRow">
-              <span className="distKey">{k}</span>
-              <span className="distVal">
-                {modalityCount[k]} <span className="distPct">{pct(modalityCount[k], total)}</span>
-              </span>
+          {Object.entries(modalities).map(([k, v]) => (
+            <div className="distRow" key={k}>
+              <div className="distKey">{k}</div>
+              <div className="distVal">
+                {v} <span className="distPct">{pct(v)}</span>
+              </div>
             </div>
           ))}
+          <div className="distNote">Counted: Sun → Pluto</div>
         </div>
       </div>
-
-      <div className="distNote">Counted: Sun → Pluto</div>
     </div>
   );
 }
