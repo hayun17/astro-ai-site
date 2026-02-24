@@ -27,6 +27,7 @@ html, body { height: 100%; }
 body {
   margin: 0;
 
+  /* Wallpaper first, overlays second */
   background-image:
     url("/cosmic-sweetness.png"),
     radial-gradient(1200px 700px at 12% 10%, rgba(255,154,194,0.12), transparent 60%),
@@ -86,12 +87,8 @@ h1 {
   -webkit-backdrop-filter: blur(2px);
 
   border-radius: 22px;
-  padding: 18px;
-  box-shadow: 0 10px 22px rgba(120, 80, 200, 0.10);
+  padding: 16px;
 }
-
-.card + .card { margin-top: 16px; }
-
 .card h2 {
   margin: 0 0 10px;
   font-size: 18px;
@@ -109,7 +106,7 @@ h1 {
   margin-bottom: 12px;
 }
 
-input, select {
+input {
   padding: 11px 12px;
   border: 1px solid rgba(200,182,255,0.55);
   border-radius: 12px;
@@ -118,17 +115,9 @@ input, select {
   outline: none;
 }
 
-select { cursor: pointer; }
-
-input:focus, select:focus {
+input:focus {
   border-color: rgba(255,154,194,0.85);
   box-shadow: 0 0 0 4px rgba(255,154,194,0.18);
-}
-
-.help{
-  margin-top: 2px;
-  font-size: 12px;
-  opacity: 0.7;
 }
 
 .row {
@@ -178,22 +167,24 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 .error { color: #b00020; }
 .muted { color: rgba(43,27,59,0.65); }
 
-/* center helpers */
-.chartCenter{
-  display: flex;
-  justify-content: center;
-  align-items: center;
+/* layout */
+.grid2{
+  display:grid;
+  grid-template-columns: 1.05fr 1.15fr;
+  gap: 18px;
+  margin-top: 18px;
 }
-.distCenter{ margin-top: 12px; }
 
-/* ✅ chart box (smaller, centered) */
+/* ✅ chart box */
 .chartBox{
   margin-top: 14px;
   display:flex;
   justify-content:center;
   align-items:center;
 
-  padding: 16px;
+  min-height: 600px;
+  padding: 18px;
+
   border-radius: 26px;
 
   background: rgba(255, 240, 250, 0.45);
@@ -205,54 +196,6 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   box-shadow:
     0 0 0 4px rgba(255, 220, 240, 0.35),
     0 20px 40px rgba(170, 120, 255, 0.28);
-}
-
-/* This makes the wheel feel “not too huge” without breaking SVG math */
-.chartBoxSmall{
-  width: min(720px, 100%);
-}
-
-/* IMPORTANT: interpretation output NOT terminal-like */
-.output {
-  white-space: pre-wrap;
-
-  background: rgba(255, 255, 255, 0.65);
-  color: rgba(43,27,59,0.92);
-
-  padding: 18px;
-  border-radius: 20px;
-
-  border: 1px solid rgba(180, 140, 255, 0.40);
-
-  font-size: 14px;
-  line-height: 1.7;
-
-  max-height: 650px;
-  overflow: auto;
-
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-
-  box-shadow:
-    inset 0 0 20px rgba(255, 255, 255, 0.55),
-    0 10px 25px rgba(140, 100, 220, 0.20);
-}
-
-/* header api */
-.api label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
-.api input { width: 320px; }
-
-.footer {
-  margin-top: 18px;
-  color: rgba(43,27,59,0.75);
-  text-align: center;
-}
-
-/* advanced details */
-.advanced summary{
-  cursor: pointer;
-  font-weight: 800;
-  margin: 8px 0;
 }
 
 /* ✅ pill */
@@ -272,33 +215,103 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   -webkit-backdrop-filter: blur(10px);
 }
 
+/* ✅ Interpretation output - slightly smaller / less wide */
+.output {
+  white-space: pre-wrap;
+
+  background: rgba(255, 255, 255, 0.65);
+  color: rgba(43,27,59,0.92);
+
+  padding: 16px;
+  border-radius: 18px;
+
+  border: 1px solid rgba(180, 140, 255, 0.40);
+
+  font-size: 13px;          /* was 14 */
+  line-height: 1.65;
+
+  max-height: 560px;        /* was 620 */
+  overflow: auto;
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  box-shadow:
+    inset 0 0 20px rgba(255, 255, 255, 0.55),
+    0 10px 25px rgba(140, 100, 220, 0.20);
+
+  max-width: 720px;         /* NEW: makes it feel less "wide wall" */
+  margin: 0 auto;           /* keep centered */
+}
+
+/* details */
+details summary {
+  cursor: pointer;
+  color: rgba(43,27,59,0.88);
+  font-weight: 750;
+  margin-top: 10px;
+}
+
+/* header api */
+.api label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.api input { width: 320px; }
+
+.footer {
+  margin-top: 18px;
+  color: rgba(43,27,59,0.75);
+}
+
 /* mobile */
 @media (max-width: 900px) {
+  .grid2 { grid-template-columns: 1fr; }
   .row { grid-template-columns: 1fr; }
   .api input { width: 100%; }
+  .chartBox{ min-height: 540px; }
+  .output{ max-width: 100%; }
 }
 
 /* =========================================================
-   ✅ NEW: Aspect table + Distributions (centered blocks)
+   ✅ extras under chart (aspect triangle + distributions)
+   make them centered BUT smaller
    ========================================================= */
 
+.extras{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 14px;
+
+  /* NEW: keep centered and not full-bleed huge */
+  max-width: 980px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* shared card look */
 .aspectCard, .distCard{
-  width: min(980px, 100%);
-  border: 1px solid rgba(120, 70, 120, 0.18);
-  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(120, 70, 120, 0.16);
+  background: rgba(255, 255, 255, 0.62);
   border-radius: 18px;
-  padding: 12px;
+
+  padding: 12px;            /* slightly reduced */
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 10px 22px rgba(120, 80, 200, 0.14);
+  box-shadow: 0 10px 22px rgba(120, 80, 200, 0.12);
+
+  /* NEW: visually smaller */
+  transform: scale(0.94);
+  transform-origin: top center;
 }
 
+/* titles a bit smaller */
 .miniTitle{
-  font-weight: 900;
+  font-weight: 850;
   margin-bottom: 10px;
   opacity: 0.92;
+  font-size: 14px;          /* NEW */
 }
 
+/* Aspect table */
 .aspectTableWrap{
   overflow: auto;
   border-radius: 14px;
@@ -307,53 +320,54 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 .aspectTable{
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 11px;          /* was 12 */
 }
 
 .aspectTable th, .aspectTable td{
-  border: 1px solid rgba(120, 70, 120, 0.12);
+  border: 1px solid rgba(120, 70, 120, 0.10);
   text-align: center;
-  padding: 6px;
-  min-width: 34px;
+
+  padding: 5px;             /* was 6 */
+  min-width: 30px;          /* was 34 */
 }
 
 .aspectTable .corner{
-  background: rgba(255,255,255,0.40);
+  background: rgba(255,255,255,0.38);
 }
 
 .aspectTable .colHead, .aspectTable .rowHead{
-  font-weight: 900;
-  background: rgba(255,255,255,0.45);
+  font-weight: 850;
+  background: rgba(255,255,255,0.42);
 }
 
 .aspectTable td.empty{
-  background: rgba(255,255,255,0.20);
+  background: rgba(255,255,255,0.18);
 }
 
 .aspectTable td.cell{
-  background: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.32);
 }
 
 .aspectTable td.mutedCell{
-  opacity: 0.40;
+  opacity: 0.48;
 }
 
 .aspGlyph{
-  font-size: 14px;
-  line-height: 14px;
+  font-size: 13px;          /* was 14 */
+  line-height: 13px;
   font-weight: 900;
 }
 
 .aspOrb{
-  font-size: 10px;
+  font-size: 9.5px;         /* was 10 */
   opacity: 0.75;
   margin-top: 2px;
 }
 
 .legend{
-  margin-top: 10px;
-  font-size: 11px;
-  opacity: 0.78;
+  margin-top: 8px;
+  font-size: 10.5px;        /* was 11 */
+  opacity: 0.72;
 }
 
 /* Distributions */
@@ -367,13 +381,14 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   border: 1px solid rgba(120, 70, 120, 0.10);
   border-radius: 14px;
   padding: 10px;
-  background: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.32);
 }
 
 .distHead{
   font-weight: 900;
   margin-bottom: 8px;
   opacity: 0.9;
+  font-size: 13px;          /* NEW */
 }
 
 .distRow{
@@ -386,22 +401,25 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 .distRow:last-child{ border-bottom: none; }
 
 .distKey{
-  font-weight: 800;
+  font-weight: 780;
   opacity: 0.85;
+  font-size: 12px;          /* NEW */
 }
 
 .distVal{
   font-weight: 900;
+  font-size: 12px;          /* NEW */
 }
 
 .distPct{
-  font-weight: 800;
+  font-weight: 850;
   opacity: 0.6;
   margin-left: 6px;
+  font-size: 12px;          /* NEW */
 }
 
 .distNote{
   margin-top: 8px;
-  font-size: 11px;
+  font-size: 10.5px;
   opacity: 0.65;
 }
