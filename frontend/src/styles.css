@@ -45,34 +45,35 @@ body {
 .page {
   max-width: 1240px;
   margin: 0 auto;
-  padding: 26px;
+  padding: 22px; /* biraz küçült */
 }
 
 /* header */
 .header {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 h1 {
   margin: 0;
-  font-size: 44px;
+  font-size: 40px; /* küçült */
   font-family: "Playfair Display", "Georgia", serif;
   font-weight: 800;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.7px;
   color: #2b1b3b;
   text-shadow: 0 4px 12px rgba(160, 120, 255, 0.35);
 }
 
 .sub {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
+  font-size: 13px;
   color: rgba(43,27,59,0.78);
 }
 
-/* cards - glassy */
+/* cards */
 .card{
   background:
     linear-gradient(
@@ -84,34 +85,56 @@ h1 {
 
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
+  border-radius: 18px;
+  padding: 14px; /* genel kart padding küçült */
 }
+
 .card h2 {
   margin: 0 0 10px;
-  font-size: 18px;
+  font-size: 17px; /* biraz küçült */
   color: var(--ink);
 }
-.card h3 { margin: 16px 0 10px; font-size: 16px; }
+.card h3 { margin: 14px 0 10px; font-size: 15px; }
 
 /* form */
 .form label {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
+  font-size: 12px; /* küçült */
   color: rgba(43,27,59,0.86);
-  margin-bottom: 12px;
+  margin-bottom: 10px; /* küçült */
 }
 
-input {
-  padding: 11px 12px;
+/* ✅ input + select aynı görünsün */
+input, select {
+  padding: 9px 11px; /* küçült */
   border: 1px solid rgba(200,182,255,0.55);
   border-radius: 12px;
-  font-size: 14px;
+  font-size: 13px; /* küçült */
   background: rgba(255,255,255,0.80);
   outline: none;
+  color: rgba(43,27,59,0.92);
 }
 
-input:focus {
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  /* küçük dropdown ok hissi */
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(90,60,120,0.55) 50%),
+    linear-gradient(135deg, rgba(90,60,120,0.55) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 2px),
+    calc(100% - 10px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 34px;
+}
+
+input:focus, select:focus {
   border-color: rgba(255,154,194,0.85);
   box-shadow: 0 0 0 4px rgba(255,154,194,0.18);
 }
@@ -119,19 +142,19 @@ input:focus {
 .row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 8px; /* küçült */
 }
 
 .actions {
   display: flex;
   gap: 10px;
-  margin-top: 8px;
+  margin-top: 6px;
   flex-wrap: wrap;
 }
 
-/* buttons - candy */
+/* buttons */
 button {
-  padding: 12px 18px;
+  padding: 10px 16px; /* küçült */
   border-radius: 999px;
 
   background: linear-gradient(135deg, rgba(255,154,194,0.98), rgba(191,168,255,0.98));
@@ -139,6 +162,7 @@ button {
 
   color: #2b1b3b;
   font-weight: 800;
+  font-size: 13px;
 
   box-shadow: 0 10px 22px rgba(255,154,194,0.22);
   cursor: pointer;
@@ -160,18 +184,18 @@ button.secondary {
 
 button:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.error { color: #b00020; }
-.muted { color: rgba(43,27,59,0.65); }
+.error { color: #b00020; font-size: 13px; }
+.muted { color: rgba(43,27,59,0.65); font-size: 13px; }
 
 /* layout */
 .grid2{
   display:grid;
   grid-template-columns: 1.05fr 1.15fr;
-  gap: 18px;
-  margin-top: 18px;
+  gap: 16px; /* küçült */
+  margin-top: 16px;
 }
 
-/* ✅ chart box (UNCHANGED — DO NOT TOUCH) */
+/* ✅ chart box: DOKUNMA */
 .chartBox{
   margin-top: 14px;
   display:flex;
@@ -194,39 +218,38 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
     0 20px 40px rgba(170, 120, 255, 0.28);
 }
 
-/* pill */
 .pill {
   display: inline-block;
-  padding: 10px 12px;
+  padding: 8px 10px; /* küçült */
   border-radius: 999px;
 
   background: rgba(255,255,255,0.60);
   border: 1px solid rgba(200,182,255,0.45);
 
   color: rgba(43,27,59,0.92);
-  font-size: 13px;
-  margin-bottom: 12px;
+  font-size: 12px; /* küçült */
+  margin-bottom: 10px;
 
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
 
-/* interpretation output (leave as-is, looks OK per you) */
+/* interpretation output: hafif küçült (en) değil, daha kompakt his) */
 .output {
   white-space: pre-wrap;
 
   background: rgba(255, 255, 255, 0.65);
   color: rgba(43,27,59,0.92);
 
-  padding: 18px;
-  border-radius: 20px;
+  padding: 16px; /* azıcık küçült */
+  border-radius: 18px;
 
   border: 1px solid rgba(180, 140, 255, 0.40);
 
-  font-size: 14px;
-  line-height: 1.7;
+  font-size: 13.5px; /* azıcık küçült */
+  line-height: 1.65;
 
-  max-height: 620px;
+  max-height: 560px; /* azıcık küçült */
   overflow: auto;
 
   backdrop-filter: blur(12px);
@@ -234,24 +257,25 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 
   box-shadow:
     inset 0 0 20px rgba(255, 255, 255, 0.55),
-    0 10px 25px rgba(140, 100, 220, 0.20);
+    0 10px 25px rgba(140, 100, 220, 0.18);
 }
 
-/* details */
 details summary {
   cursor: pointer;
   color: rgba(43,27,59,0.88);
   font-weight: 750;
   margin-top: 10px;
+  font-size: 13px;
 }
 
 /* header api */
-.api label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.api label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
 .api input { width: 320px; }
 
 .footer {
-  margin-top: 18px;
+  margin-top: 16px;
   color: rgba(43,27,59,0.75);
+  font-size: 12.5px;
 }
 
 /* mobile */
@@ -264,75 +288,73 @@ details summary {
 
 /* =========================================================
    ✅ extras under chart (aspect table + distributions)
-   Make SMALLER without affecting the wheel
+   MAKE SMALLER + keep centered
    ========================================================= */
 
 .extras{
-  margin-top: 14px;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 10px;
+  margin-top: 12px;
 
-  /* keep centered + not ridiculously wide */
-  max-width: 1020px;
+  max-width: 920px;   /* ✅ daha dar */
   margin-left: auto;
   margin-right: auto;
 }
 
-/* shared card look — smaller paddings */
 .aspectCard, .distCard{
-  border: 1px solid rgba(120, 70, 120, 0.16);
-  background: rgba(255, 255, 255, 0.62);
-  border-radius: 18px;
+  border: 1px solid rgba(120, 70, 120, 0.14);
+  background: rgba(255, 255, 255, 0.60);
+  border-radius: 16px;
 
-  padding: 10px; /* was 12 */
+  padding: 9px; /* ✅ daha küçük */
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 10px 22px rgba(120, 80, 200, 0.12);
+  box-shadow: 0 10px 22px rgba(120, 80, 200, 0.10);
 }
 
 .miniTitle{
   font-weight: 850;
   margin-bottom: 8px;
   opacity: 0.92;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
-/* Aspect table: smaller cell geometry */
+/* Aspect table */
 .aspectTableWrap{
   overflow: auto;
-  border-radius: 14px;
+  border-radius: 12px;
 }
 
 .aspectTable{
   width: 100%;
   border-collapse: collapse;
-  font-size: 10.5px; /* smaller */
+  font-size: 9.5px; /* ✅ küçült */
 }
 
 .aspectTable th, .aspectTable td{
-  border: 1px solid rgba(120, 70, 120, 0.10);
+  border: 1px solid rgba(120, 70, 120, 0.09);
   text-align: center;
 
-  padding: 4px;     /* smaller */
-  min-width: 26px;  /* smaller */
+  padding: 3px;     /* ✅ küçült */
+  min-width: 22px;  /* ✅ küçült */
 }
 
 .aspectTable .corner{
-  background: rgba(255,255,255,0.38);
+  background: rgba(255,255,255,0.36);
 }
 
 .aspectTable .colHead, .aspectTable .rowHead{
   font-weight: 850;
-  background: rgba(255,255,255,0.42);
+  background: rgba(255,255,255,0.40);
 }
 
 .aspectTable td.empty{
-  background: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.16);
 }
 
 .aspectTable td.cell{
-  background: rgba(255,255,255,0.32);
+  background: rgba(255,255,255,0.30);
 }
 
 .aspectTable td.mutedCell{
@@ -340,48 +362,48 @@ details summary {
 }
 
 .aspGlyph{
-  font-size: 12px;
-  line-height: 12px;
+  font-size: 11px;
+  line-height: 11px;
   font-weight: 900;
 }
 
 .aspOrb{
-  font-size: 9px;
-  opacity: 0.72;
+  font-size: 8.5px;
+  opacity: 0.70;
   margin-top: 2px;
 }
 
 .legend{
   margin-top: 8px;
-  font-size: 10px;
-  opacity: 0.72;
+  font-size: 9.5px;
+  opacity: 0.70;
 }
 
-/* Distributions: smaller */
+/* Distributions */
 .distGrid{
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 9px;
 }
 
 .distBlock{
-  border: 1px solid rgba(120, 70, 120, 0.10);
-  border-radius: 14px;
-  padding: 9px;
-  background: rgba(255,255,255,0.32);
+  border: 1px solid rgba(120, 70, 120, 0.09);
+  border-radius: 12px;
+  padding: 8px; /* ✅ küçült */
+  background: rgba(255,255,255,0.30);
 }
 
 .distHead{
   font-weight: 900;
-  margin-bottom: 7px;
+  margin-bottom: 6px;
   opacity: 0.9;
-  font-size: 12.5px;
+  font-size: 12px;
 }
 
 .distRow{
   display: flex;
   justify-content: space-between;
-  padding: 3px 0;
+  padding: 2px 0; /* ✅ küçült */
   border-bottom: 1px dashed rgba(120, 70, 120, 0.10);
 }
 
@@ -390,23 +412,23 @@ details summary {
 .distKey{
   font-weight: 780;
   opacity: 0.85;
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
 .distVal{
   font-weight: 900;
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
 .distPct{
   font-weight: 850;
   opacity: 0.6;
   margin-left: 6px;
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
 .distNote{
   margin-top: 8px;
-  font-size: 10px;
+  font-size: 9.5px;
   opacity: 0.65;
 }
