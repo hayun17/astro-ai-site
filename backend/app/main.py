@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -42,6 +43,11 @@ app.add_middleware(
 )
 
 # ---------- helpers ----------
+_SIGNS = [
+    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+]
+
 def _read_text_if_exists(fp: Path) -> str | None:
     if not fp.exists():
         return None
@@ -74,6 +80,163 @@ def _find_placement_file(body: str, sign: str) -> str | None:
         if txt:
             return txt
     return None
+
+
+def _lon_to_sign(lon: float) -> str:
+    x = float(lon) % 360.0
+    idx = int(x // 30.0)
+    return _SIGNS[idx]
+
+
+def _get_house_cusp_signs(chart: dict) -> list[str | None]:
+    """
+    Returns list of 12 cusp signs for houses 1..12.
+    Supports:
+      houses.cusps = [float,...]  length 12
+      houses.cusps = [{"lon":..,"sign":..},...] length 12
+      houses.signs = [sign,...] length 12
+    """
+    houses = chart.get("houses", {}) or {}
+
+    # case 1: houses.signs
+    signs = houses.get("signs")
+    if isinstance(signs, list) and len(signs) == 12:
+        return [str(s) if s else None for s in signs]
+
+    cusps = houses.get("cusps")
+    if isinstance(cusps, list) and len(cusps) == 12:
+        # case 2: list[dict]
+        if isinstance(cusps[0], dict):
+            out: list[str | None] = []
+            for c in cusps:
+                s = c.get("sign")
+                if s:
+                    out.append(str(s))
+                else:
+                    lon = c.get("lon")
+                    out.append(_lon_to_sign(float(lon)) if lon is not None else None)
+            return out
+
+        # case 3: list[float]
+        if all(isinstance(v, (int, float)) for v in cusps):
+            return [_lon_to_sign(float(v)) for v in cusps]
+
+    return [None] * 12
+
+
+def build_rag_query(chart: dict) -> str:
+    """
+    CRITICAL: Retrieval query scope.
+    Includes:
+      - Sun..Pluto + TrueNode + Lilith + Chiron (if sign exists)
+      - Asc/MC/DSC/IC/Vertex/Fortune (if exists)
+      - House cusp signs 1..12 (if exists)
+      - Top aspects tokens (for extra anchoring)
+      - Strong tag-like anchors to match your corpus headers
+    """
+    planets = chart.get("planets", {}) or {}
+    points = chart.get("points", {}) or {}
+
+    def psign(p: str) -> str | None:
+        return (planets.get(p, {}) or {}).get("sign")
+
+    def xsign_point(k: str) -> str | None:
+        return (points.get(k, {}) or {}).get("sign")
+
+    # aspects summary for query
+    aspects = chart.get("aspects", {}) or {}
+    planet_aspects = aspects.get("planet_aspects", []) or []
+    other_aspects = aspects.get("other_aspects", []) or []
+    all_aspects = sorted((planet_aspects + other_aspects), key=lambda x: x.get("orb", 999.0))
+    top_aspects = all_aspects[:25]
+
+    # ---- base query ----
+    q_parts: list[str] = []
+    q_parts.append("natal chart interpretation")
+
+    # ---- planet + sign tokens ----
+    for p in [
+        "Sun","Moon","Mercury","Venus","Mars",
+        "Jupiter","Saturn","Uranus","Neptune","Pluto",
+        "TrueNode","Chiron","Lilith"
+    ]:
+        s = psign(p)
+        if s:
+            q_parts.append(f"{p} {s}")
+            q_parts.append(f"{p} in {s}")
+
+    # ---- points tokens (include DSC/IC too) ----
+    for k in ["Asc", "MC", "DSC", "IC", "Vertex", "Fortune"]:
+        s = xsign_point(k)
+        if s:
+            q_parts.append(f"{k} {s}")
+            q_parts.append(f"{k} in {s}")
+
+    # ---- house cusp signs ----
+    house_signs = _get_house_cusp_signs(chart)
+    ords = ["1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th","11th","12th"]
+    for i, s in enumerate(house_signs, start=1):
+        if not s:
+            continue
+        q_parts.append(f"{ords[i-1]} House {s}")
+        q_parts.append(f"{ords[i-1]} House in {s}")
+        # anchor-y tokens for your future house corpus tags
+        q_parts.append(f"HOUSE_{i} {s}")
+        q_parts.append(f"[TYPE=HOUSE] [BODY=HOUSE_{i}] [SIGN={str(s).upper()}]")
+
+    # ---- strong anchors for existing PLACEMENT corpus tags ----
+    # These match the header style you showed:
+    # [TYPE=PLACEMENT] [BODY=MARS] [SIGN=ARIES] [KEY=mars_in_aries]
+    def anchor(typ: str, body_tag: str, sign: str | None, key: str):
+        if sign:
+            q_parts.append(f"[TYPE={typ}] [BODY={body_tag}] [SIGN={str(sign).upper()}] [KEY={key}]")
+
+    # placements
+    for body_tag, pkey, folder in [
+        ("SUN", "Sun", "sun"),
+        ("MOON", "Moon", "moon"),
+        ("MERCURY", "Mercury", "mercury"),
+        ("VENUS", "Venus", "venus"),
+        ("MARS", "Mars", "mars"),
+        ("JUPITER", "Jupiter", "jupiter"),
+        ("SATURN", "Saturn", "saturn"),
+        ("URANUS", "Uranus", "uranus"),
+        ("NEPTUNE", "Neptune", "neptune"),
+        ("PLUTO", "Pluto", "pluto"),
+        ("TRUENODE", "TrueNode", "true_node"),
+        ("CHIRON", "Chiron", "chiron"),
+        ("LILITH", "Lilith", "lilith"),
+    ]:
+        s = psign(pkey)
+        if s:
+            anchor("PLACEMENT", body_tag, s, f"{folder}_in_{str(s).lower()}")
+
+    # points (optional corpus tags if you add later)
+    for body_tag, k in [
+        ("ASC", "Asc"),
+        ("MC", "MC"),
+        ("DSC", "DSC"),
+        ("IC", "IC"),
+        ("VERTEX", "Vertex"),
+        ("FORTUNE", "Fortune"),
+    ]:
+        s = xsign_point(k)
+        if s:
+            anchor("POINT", body_tag, s, f"{body_tag.lower()}_in_{str(s).lower()}")
+
+    # ---- aspects tokens ----
+    asp_tokens = []
+    for a in top_aspects:
+        p1 = a.get("p1")
+        p2 = a.get("p2")
+        asp = a.get("aspect")
+        if p1 and p2 and asp:
+            asp_tokens.append(f"{p1} {asp} {p2}")
+    if asp_tokens:
+        q_parts.append(" | " + " ".join(asp_tokens))
+
+    # join
+    return " ".join(q_parts)
 
 
 @app.get("/api/health")
@@ -141,74 +304,11 @@ def interpret_natal(birth: BirthData):
     def _xsign_point(k: str) -> str | None:
         return (points.get(k, {}) or {}).get("sign")
 
-    # ---- signs we care about ----
-    sun_sign = _psign("Sun")
-    moon_sign = _psign("Moon")
-    mercury_sign = _psign("Mercury")
-    venus_sign = _psign("Venus")
-    mars_sign = _psign("Mars")
-
-    true_node_sign = _psign("TrueNode")
-    chiron_sign = _psign("Chiron")
-    lilith_sign = _psign("Lilith")
-
-    vertex_sign = _xsign_point("Vertex")
-    fortune_sign = _xsign_point("Fortune")
-
-    # aspects summary for query
-    aspects = chart.get("aspects", {}) or {}
-    planet_aspects = aspects.get("planet_aspects", []) or []
-    other_aspects = aspects.get("other_aspects", []) or []
-    all_aspects = sorted((planet_aspects + other_aspects), key=lambda x: x.get("orb", 999.0))
-    top_aspects = all_aspects[:20]
-
-    # ---- build query ----
-    q = "natal chart interpretation "
-
-    # planet+sign tokens
-    for p in [
-        "Sun","Moon","Mercury","Venus","Mars",
-        "Jupiter","Saturn","Uranus","Neptune","Pluto",
-        "TrueNode","Chiron","Lilith"
-    ]:
-        s = (planets.get(p, {}) or {}).get("sign")
-        if s:
-            q += f"{p} {s} "
-
-    # points tokens
-    for k in ["Asc", "MC", "Vertex", "Fortune"]:
-        s = (points.get(k, {}) or {}).get("sign")
-        if s:
-            q += f"{k} {s} "
-
-    # add strong anchors (match your corpus tags)
-    def _anchor(body_tag: str, sign: str | None, key: str):
-        nonlocal q
-        if sign:
-            q += f" | [BODY={body_tag}] [SIGN={str(sign).upper()}] | KEY={key} "
-
-    _anchor("SUN", sun_sign, f"sun_in_{str(sun_sign).lower()}" if sun_sign else "sun_in_x")
-    _anchor("MOON", moon_sign, f"moon_in_{str(moon_sign).lower()}" if moon_sign else "moon_in_x")
-    _anchor("MERCURY", mercury_sign, f"mercury_in_{str(mercury_sign).lower()}" if mercury_sign else "mercury_in_x")
-    _anchor("VENUS", venus_sign, f"venus_in_{str(venus_sign).lower()}" if venus_sign else "venus_in_x")
-    _anchor("MARS", mars_sign, f"mars_in_{str(mars_sign).lower()}" if mars_sign else "mars_in_x")
-
-    _anchor("TRUENODE", true_node_sign, f"true_node_in_{str(true_node_sign).lower()}" if true_node_sign else "true_node_in_x")
-    _anchor("CHIRON", chiron_sign, f"chiron_in_{str(chiron_sign).lower()}" if chiron_sign else "chiron_in_x")
-    _anchor("LILITH", lilith_sign, f"lilith_in_{str(lilith_sign).lower()}" if lilith_sign else "lilith_in_x")
-
-    _anchor("VERTEX", vertex_sign, f"vertex_in_{str(vertex_sign).lower()}" if vertex_sign else "vertex_in_x")
-    _anchor("FORTUNE", fortune_sign, f"fortune_in_{str(fortune_sign).lower()}" if fortune_sign else "fortune_in_x")
-
-    # aspects tokens
-    q += " | " + " ".join(
-        f"{a.get('p1')} {a.get('aspect')} {a.get('p2')}"
-        for a in top_aspects
-        if a.get("p1") and a.get("p2") and a.get("aspect")
-    )
+    # ---- build retrieval query (UPDATED: includes houses + outer + full angles) ----
+    q = build_rag_query(chart)
 
     # ---- retrieval ----
-    passages = retrieve(q, k=40)
+    passages = retrieve(q, k=60)
 
     # ---- OPTIONAL: Force key placement files to always be present (top) ----
     forced: list[dict] = []
@@ -222,18 +322,27 @@ def interpret_natal(birth: BirthData):
                 {"source": f"FORCED | placements/{body_folder}/{body_folder}_in_{str(sign).lower()}.txt", "text": txt}
             )
 
-    _force("sun", sun_sign)
-    _force("moon", moon_sign)
-    _force("mercury", mercury_sign)
-    _force("venus", venus_sign)
-    _force("mars", mars_sign)
+    # planets
+    for folder, key in [
+        ("sun", "Sun"),
+        ("moon", "Moon"),
+        ("mercury", "Mercury"),
+        ("venus", "Venus"),
+        ("mars", "Mars"),
+        ("jupiter", "Jupiter"),
+        ("saturn", "Saturn"),
+        ("uranus", "Uranus"),
+        ("neptune", "Neptune"),
+        ("pluto", "Pluto"),
+        ("chiron", "Chiron"),
+        ("true_node", "TrueNode"),
+        ("lilith", "Lilith"),
+    ]:
+        _force(folder, _psign(key))
 
-    _force("chiron", chiron_sign)
-    _force("true_node", true_node_sign)
-    _force("lilith", lilith_sign)
-
-    _force("vertex", vertex_sign)
-    _force("fortune", fortune_sign)
+    # points
+    _force("vertex", _xsign_point("Vertex"))
+    _force("fortune", _xsign_point("Fortune"))
 
     if forced:
         forced_texts = {f["text"] for f in forced}
@@ -243,7 +352,7 @@ def interpret_natal(birth: BirthData):
     # ---- generate ----
     text = generate_interpretation(
         system_prompt="You are a professional astrology interpreter.",
-        user_prompt=f"Chart data:\n{chart}",
+        user_prompt=f"Chart data:\n{json.dumps(chart, ensure_ascii=False)}",
         retrieved_passages=passages,
     )
 
@@ -251,4 +360,5 @@ def interpret_natal(birth: BirthData):
         "chart": chart,
         "interpretation": text,
         "retrieval": passages,
+        "query": q,
     }

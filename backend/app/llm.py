@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import json
 import re
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
 
 from openai import OpenAI
 
@@ -70,7 +70,7 @@ def _planet_line(name: str, p: Dict[str, Any]) -> str:
     return f"- {name}: {sign} {_deg_str(float(deg))}{hs}"
 
 
-def _top_aspects(chart: Dict[str, Any], n: int = 10) -> List[Dict[str, Any]]:
+def _top_aspects(chart: Dict[str, Any], n: int = 12) -> List[Dict[str, Any]]:
     aspects = (chart.get("aspects") or {})
     planet_aspects = aspects.get("planet_aspects") or []
     other_aspects = aspects.get("other_aspects") or []
@@ -86,14 +86,13 @@ def _top_aspects(chart: Dict[str, Any], n: int = 10) -> List[Dict[str, Any]]:
 
 
 # -----------------------------
-# NEW: Metadata stripping (works for inline tags too)
+# Metadata stripping (works for inline tags too)
 # -----------------------------
 _TAG_INLINE_RE = re.compile(r"\[(TYPE|BODY|SIGN|KEY)=[^\]]+\]\s*", re.IGNORECASE)
 
 def _strip_metadata(text: str) -> str:
     if not text:
         return ""
-
     t = text.strip()
     t = _TAG_INLINE_RE.sub("", t)
     t = re.sub(r"[ \t]{2,}", " ", t)
@@ -101,23 +100,34 @@ def _strip_metadata(text: str) -> str:
     return t
 
 
-def _pick_placement_passage(
+def _pick_passage_by_tags(
     passages: List[Dict[str, str]] | None,
     *,
     body: str,
     sign: str,
+    typ: str | None = None,
 ) -> Optional[str]:
+    """
+    Finds a corpus passage by strict tag match:
+      [BODY=XXX] [SIGN=YYY] and optionally [TYPE=...]
+    Falls back to "Body in Sign" (case-insensitive).
+    """
     if not passages or not body or not sign:
         return None
 
     body_u = body.upper()
     sign_u = sign.upper()
+    typ_u = (typ or "").upper()
 
     # strict tag match first
     for p in passages:
         txt = (p.get("text") or "")
         if f"[BODY={body_u}]" in txt and f"[SIGN={sign_u}]" in txt:
-            return _strip_metadata(txt)
+            if typ_u:
+                if f"[TYPE={typ_u}]" in txt:
+                    return _strip_metadata(txt)
+            else:
+                return _strip_metadata(txt)
 
     # fallback: "Body in Sign" match
     needle = f"{body.title()} in {sign.title()}"
@@ -159,6 +169,7 @@ def _houses_12_lines(houses: Dict[str, Any]) -> List[str]:
 
     out: List[str] = []
 
+    # If cusps are dicts (sign/deg_in_sign)
     if isinstance(cusps, list) and len(cusps) == 12 and isinstance(cusps[0], dict):
         for i, c in enumerate(cusps, start=1):
             sign = c.get("sign")
@@ -169,11 +180,13 @@ def _houses_12_lines(houses: Dict[str, Any]) -> List[str]:
                 out.append(f"- {_ordinal(i)} House: {sign} {_deg_str(float(deg))}")
         return out
 
+    # If signs list
     if isinstance(signs, list) and len(signs) == 12:
         for i, s in enumerate(signs, start=1):
             out.append(f"- {_ordinal(i)} House: {s}")
         return out
 
+    # If cusps are floats (0..360)
     if isinstance(cusps, list) and len(cusps) == 12 and all(isinstance(v, (int, float)) for v in cusps):
         for i, lon in enumerate(cusps, start=1):
             sign, deg_in_sign = _lon_to_sign_deg(float(lon))
@@ -185,8 +198,34 @@ def _houses_12_lines(houses: Dict[str, Any]) -> List[str]:
     return out
 
 
+def _houses_12_signs(houses: Dict[str, Any]) -> List[Optional[str]]:
+    """
+    Returns house cusp signs [1..12] as list of 12 items.
+    """
+    cusps = houses.get("cusps")
+    signs = houses.get("signs")
+
+    if isinstance(signs, list) and len(signs) == 12:
+        return [str(s) if s else None for s in signs]
+
+    if isinstance(cusps, list) and len(cusps) == 12 and isinstance(cusps[0], dict):
+        out: List[Optional[str]] = []
+        for c in cusps:
+            out.append(str(c.get("sign")) if c.get("sign") else None)
+        return out
+
+    if isinstance(cusps, list) and len(cusps) == 12 and all(isinstance(v, (int, float)) for v in cusps):
+        out: List[Optional[str]] = []
+        for lon in cusps:
+            sign, _ = _lon_to_sign_deg(float(lon))
+            out.append(sign)
+        return out
+
+    return [None] * 12
+
+
 # -----------------------------
-# Corpus-only fallback writer (UPDATED: extras included)
+# Corpus-only fallback writer (UPDATED: outer planets + house interpretations)
 # -----------------------------
 def _corpus_only_interpretation(
     *,
@@ -198,19 +237,30 @@ def _corpus_only_interpretation(
     points = chart.get("points") or {}
     houses = chart.get("houses") or {}
 
+    # core
     sun = planets.get("Sun") or {}
     moon = planets.get("Moon") or {}
     mercury = planets.get("Mercury") or {}
     venus = planets.get("Venus") or {}
     mars = planets.get("Mars") or {}
 
-    # extras (planets dict)
+    # outer planets
+    jupiter = planets.get("Jupiter") or {}
+    saturn = planets.get("Saturn") or {}
+    uranus = planets.get("Uranus") or {}
+    neptune = planets.get("Neptune") or {}
+    pluto = planets.get("Pluto") or {}
+
+    # extras
     true_node = planets.get("TrueNode") or {}
     chiron = planets.get("Chiron") or {}
     lilith = planets.get("Lilith") or {}
 
-    # points dict
+    # points
     asc = points.get("Asc") or {}
+    mc = points.get("MC") or {}
+    dsc = points.get("DSC") or {}
+    ic = points.get("IC") or {}
     vertex = points.get("Vertex") or {}
     fortune = points.get("Fortune") or {}
 
@@ -220,11 +270,11 @@ def _corpus_only_interpretation(
 
     lines: List[str] = []
 
-    # Intro
+    # Intro (samimi)
     if sun_sign and moon_sign and asc_sign:
         lines.append(
-            f"Senin haritanda ana vibe: **{sun_sign} Güneş** + **{moon_sign} Ay**, dışarıya ise **{asc_sign} yükselen** gibi akıyor.\n"
-            f"Bunu bir cümleyle özetlersek: *özgürlük ihtiyacın var ama bağ kurmak da istiyorsun; zihin hızlı çalışırken kalbi de duymayı öğreniyorsun.*"
+            f"Senin haritanda ana vibe: **{sun_sign} Güneş** + **{moon_sign} Ay**, dışarıya ise **{asc_sign} yükselen** gibi akıyor. "
+            f"Bir cümleyle: *içgüdün derin, hedeflerin net; ama ruhun nefes almak için özgürlüğe de ihtiyaç duyuyor.*"
         )
     else:
         lines.append("Senin haritanda genel vibe: (veri eksik olduğu için kısa özet).")
@@ -238,15 +288,15 @@ def _corpus_only_interpretation(
     else:
         lines.append("- Asc: (unavailable)")
 
-    # Sun/Moon placement texts
+    # Sun/Moon texts
     if sun_sign:
-        sun_txt = _pick_placement_passage(retrieved_passages, body="SUN", sign=str(sun_sign))
+        sun_txt = _pick_passage_by_tags(retrieved_passages, body="SUN", sign=str(sun_sign), typ="PLACEMENT")
         if sun_txt:
             lines.append("\n**Sun — Core Identity**")
             lines.append(sun_txt)
 
     if moon_sign:
-        moon_txt = _pick_placement_passage(retrieved_passages, body="MOON", sign=str(moon_sign))
+        moon_txt = _pick_passage_by_tags(retrieved_passages, body="MOON", sign=str(moon_sign), typ="PLACEMENT")
         if moon_txt:
             lines.append("\n**Moon — Emotional Needs**")
             lines.append(moon_txt)
@@ -258,75 +308,131 @@ def _corpus_only_interpretation(
     lines.append(_planet_line("Mars", mars))
 
     for body, title in [
-        ("Mercury", "Mercury — Communication"),
-        ("Venus", "Venus — Love & Attraction"),
-        ("Mars", "Mars — Drive & Action"),
+        ("MERCURY", "Mercury — Communication"),
+        ("VENUS", "Venus — Love & Attraction"),
+        ("MARS", "Mars — Drive & Action"),
     ]:
-        p = planets.get(body) or {}
+        p = planets.get(body.title()) if body != "MERCURY" else planets.get("Mercury")
+        if body == "VENUS":
+            p = planets.get("Venus")
+        if body == "MARS":
+            p = planets.get("Mars")
+        p = p or {}
         sign = p.get("sign")
         if not sign:
             continue
-        txt = _pick_placement_passage(retrieved_passages, body=body.upper(), sign=str(sign))
+        txt = _pick_passage_by_tags(retrieved_passages, body=body, sign=str(sign), typ="PLACEMENT")
         if txt:
             lines.append(f"\n**{title}**")
             lines.append(txt)
 
-    # 3) Extras (UPDATED)
-    lines.append("\n### 3) Nodes + Healing + Extras")
+    # 3) Outer planets (NEW)
+    lines.append("\n### 3) Outer planets (Jupiter → Pluto)")
+    lines.append(_planet_line("Jupiter", jupiter))
+    lines.append(_planet_line("Saturn", saturn))
+    lines.append(_planet_line("Uranus", uranus))
+    lines.append(_planet_line("Neptune", neptune))
+    lines.append(_planet_line("Pluto", pluto))
+
+    for body, title in [
+        ("JUPITER", "Jupiter — Growth & Luck"),
+        ("SATURN", "Saturn — Lessons & Mastery"),
+        ("URANUS", "Uranus — Change & Awakening"),
+        ("NEPTUNE", "Neptune — Dreams & Sensitivity"),
+        ("PLUTO", "Pluto — Power & Transformation"),
+    ]:
+        p = planets.get(body.title()) if body not in ["URANUS", "NEPTUNE"] else planets.get(body.title().capitalize())
+        # safer:
+        p = planets.get(body.title().capitalize()) or planets.get(body.title()) or planets.get(body.capitalize()) or {}
+        sign = (p or {}).get("sign")
+        if not sign:
+            continue
+        txt = _pick_passage_by_tags(retrieved_passages, body=body, sign=str(sign), typ="PLACEMENT")
+        if txt:
+            lines.append(f"\n**{title}**")
+            lines.append(txt)
+
+    # 4) Nodes + Healing + Extras
+    lines.append("\n### 4) Nodes + Healing + Extras")
     lines.append(_planet_line("TrueNode", true_node))
     lines.append(_planet_line("Chiron", chiron))
     lines.append(_planet_line("Lilith", lilith))
 
-    # Add their texts if present
-    for body, title in [
-        ("TRUENODE", "True Node — Direction & Growth"),
-        ("CHIRON", "Chiron — Wound & Medicine"),
-        ("LILITH", "Lilith — Raw Truth & Boundaries"),
+    for body, title, key in [
+        ("TRUENODE", "True Node — Direction & Growth", "TrueNode"),
+        ("CHIRON", "Chiron — Wound & Medicine", "Chiron"),
+        ("LILITH", "Lilith — Raw Truth & Boundaries", "Lilith"),
     ]:
-        p = planets.get(body.title() if body != "TRUENODE" else "TrueNode") or {}
+        p = planets.get(key) or {}
         sign = p.get("sign")
         if not sign:
             continue
-        txt = _pick_placement_passage(retrieved_passages, body=body, sign=str(sign))
+        txt = _pick_passage_by_tags(retrieved_passages, body=body, sign=str(sign), typ="PLACEMENT")
         if txt:
             lines.append(f"\n**{title}**")
             lines.append(txt)
 
-    # 4) Angles/points
+    # 5) Angles / points (NEW: optionally interpret if corpus exists)
     def _pt_line(label: str, pt: Dict[str, Any]) -> str:
         if not pt or pt.get("sign") is None or pt.get("deg_in_sign") is None:
             return f"- {label}: (unavailable)"
         return f"- {label}: {pt['sign']} {_deg_str(float(pt['deg_in_sign']))}"
 
-    lines.append("\n### 4) Angles / points")
-    lines.append(_pt_line("Asc", points.get("Asc") or {}))
-    lines.append(_pt_line("MC", points.get("MC") or {}))
-    lines.append(_pt_line("DSC", points.get("DSC") or {}))
-    lines.append(_pt_line("IC", points.get("IC") or {}))
+    lines.append("\n### 5) Angles / points")
+    lines.append(_pt_line("Asc", asc))
+    lines.append(_pt_line("MC", mc))
+    lines.append(_pt_line("DSC", dsc))
+    lines.append(_pt_line("IC", ic))
     lines.append(_pt_line("Vertex", vertex))
     lines.append(_pt_line("Fortune", fortune))
 
-    # Vertex/Fortune texts (optional)
     for body, title, obj in [
-        ("VERTEX", "Vertex — Fated Meetings & Turning Points", vertex),
-        ("FORTUNE", "Part of Fortune — Ease, Flow, Sweet Spots", fortune),
+        ("ASC", "Ascendant — How you show up", asc),
+        ("MC", "Midheaven — Public path & career vibe", mc),
+        ("DSC", "Descendant — Relationship mirror", dsc),
+        ("IC", "IC — Inner roots & emotional base", ic),
+        ("VERTEX", "Vertex — Fated meetings & turning points", vertex),
+        ("FORTUNE", "Part of Fortune — Ease, flow, sweet spots", fortune),
     ]:
         sign = (obj or {}).get("sign")
         if not sign:
             continue
-        txt = _pick_placement_passage(retrieved_passages, body=body, sign=str(sign))
+        txt = _pick_passage_by_tags(retrieved_passages, body=body, sign=str(sign), typ="POINT")
         if txt:
             lines.append(f"\n**{title}**")
             lines.append(txt)
 
-    # 5) Houses
-    lines.append("\n### 5) Houses (12)")
+    # 6) Houses (12) + house interpretations (NEW)
+    lines.append("\n### 6) Houses (12)")
     lines.extend(_houses_12_lines(houses))
 
-    # 6) Aspects
-    aspects = _top_aspects(chart, n=10)
-    lines.append("\n### 6) Top aspects (tightest first)")
+    house_signs = _houses_12_signs(houses)
+
+    lines.append("\n### 7) House interpretations (sign on each house cusp)")
+    any_house_text = False
+    for i, sign in enumerate(house_signs, start=1):
+        if not sign:
+            continue
+
+        # Expected corpus tags:
+        # [TYPE=HOUSE]
+        # [BODY=HOUSE_1]
+        # [SIGN=CAPRICORN]
+        body = f"HOUSE_{i}"
+        txt = _pick_passage_by_tags(retrieved_passages, body=body, sign=str(sign), typ="HOUSE")
+        if txt:
+            any_house_text = True
+            lines.append(f"\n**{_ordinal(i)} House in {sign}**")
+            lines.append(txt)
+
+    if not any_house_text:
+        lines.append("- (House corpus metni yoksa burada görünmez; dosyaları ekleyince otomatik basacak.)")
+
+    # 8) Aspects
+    aspects = _top_aspects(chart, n=12)
+    lines.append("\n### 8) Top aspects (tightest first)")
     if aspects:
+        seen = set()
         for a in aspects:
             p1 = a.get("p1")
             p2 = a.get("p2")
@@ -334,6 +440,10 @@ def _corpus_only_interpretation(
             orb = a.get("orb")
             if not (p1 and p2 and asp is not None):
                 continue
+            k = (str(p1), str(asp), str(p2), str(orb))
+            if k in seen:
+                continue
+            seen.add(k)
             try:
                 orb_f = float(orb)
                 orb_s = _deg_str(orb_f)
@@ -343,7 +453,7 @@ def _corpus_only_interpretation(
     else:
         lines.append("- (No aspects available)")
 
-    lines.append("\n**Orb tip (kısa):** 0–2° = çok baskın; 2–4° = güçlü; 4–6° = hissedilir; 6°+ = arka plan (ama tekrar ediyorsa önem kazanır).")
+    lines.append("\n**Orb tip:** 0–2° çok baskın; 2–4° güçlü; 4–6° hissedilir; 6°+ arka plan (ama tekrar ediyorsa önem kazanır).")
 
     return "\n".join(lines).strip()
 
@@ -376,7 +486,7 @@ def generate_interpretation(
     context = ""
     if retrieved_passages:
         lines = []
-        for p in retrieved_passages[:10]:
+        for p in retrieved_passages[:12]:
             src = p.get("source", "")
             txt = p.get("text", "")
             if not txt:

@@ -1,0 +1,6 @@
+[TYPE=HOUSE]
+[BODY=HOUSE_1]
+[SIGN=LIBRA]
+[KEY=house_1_in_libra]
+
+With Libra on the 1st House, your presence feels balanced, diplomatic, and socially aware. People experience you as pleasant, fair-minded, and relationship-oriented. Your identity evolves through connection and reflection in others. You may naturally seek harmony and avoid conflict. The challenge is indecision or people-pleasing, but your strength lies in grace and emotional intelligence. You’re here to bring equilibrium into every room you enter.

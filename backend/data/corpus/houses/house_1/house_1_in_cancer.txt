@@ -1,0 +1,6 @@
+[TYPE=HOUSE]
+[BODY=HOUSE_1]
+[SIGN=CANCER]
+[KEY=house_1_in_cancer]
+
+With Cancer on the 1st House, you move through the world with emotional awareness and protective instincts. Others experience you as gentle, intuitive, or nurturing. Your identity is closely tied to feeling safe and creating security. You may appear reserved at first, revealing layers slowly. The challenge is taking things personally, but your strength lies in empathy. You’re here to lead through emotional intelligence and genuine care.
