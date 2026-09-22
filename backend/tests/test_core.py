@@ -331,6 +331,36 @@ class ExtendedSuiteTests(unittest.TestCase):
         })
         self.assertEqual(r.status_code, 403)
 
+    def test_synastry_connection_profile_is_descriptive_not_success_probability(self):
+        r = self.client.post("/api/interpret/synastry", json={"person_a": self.a, "person_b": self.b, "style": "modern", "orb_profile": "standard"})
+        self.assertEqual(r.status_code, 200)
+        profile = r.json()["synastry"]["connection_profile"]
+        self.assertEqual(set(profile["scores"]), {"emotional", "communication", "chemistry", "stability", "growth", "friction"})
+        self.assertTrue(all(0 <= int(v) <= 100 for v in profile["scores"].values()))
+        self.assertIn("not probabilities", profile["method_note"].lower())
+
+    def test_tight_orbs_do_not_return_more_aspects_than_wide(self):
+        tight = self.client.post("/api/chart/synastry", json={"person_a": self.a, "person_b": self.b, "style": "modern", "orb_profile": "tight"}).json()
+        wide = self.client.post("/api/chart/synastry", json={"person_a": self.a, "person_b": self.b, "style": "modern", "orb_profile": "wide"}).json()
+        self.assertLessEqual(len(tight["aspects"]), len(wide["aspects"]))
+
+    def test_composite_returns_relationship_signature(self):
+        r = self.client.post("/api/interpret/composite", json={"person_a": self.a, "person_b": self.b, "style": "modern"})
+        self.assertEqual(r.status_code, 200)
+        sig = r.json()["signature"]
+        self.assertTrue(sig["keywords"])
+        self.assertIn("not a relationship outcome score", sig["method_note"].lower())
+
+    def test_payment_config_does_not_expose_credentials(self):
+        r = self.client.get("/api/payments/config")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertIn("ready", body)
+        self.assertIn("products", body)
+        serialized = str(body).lower()
+        self.assertNotIn("secret", serialized)
+        self.assertNotIn("api_key", serialized)
+
 
 if __name__ == "__main__":
     unittest.main()

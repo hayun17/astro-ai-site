@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ChartWheel from "./components/chart/ChartWheel";
 import AspectTriangle from "./components/chart/AspectTriangle";
 import Distributions from "./components/chart/Distributions";
@@ -8,6 +8,8 @@ import PrecisePositions from "./components/PrecisePositions";
 import PremiumReadings from "./components/PremiumReadings";
 import InterpretationView from "./components/InterpretationView";
 import SynastryBiWheel from "./components/chart/SynastryBiWheel";
+import CalculationProgress from "./components/CalculationProgress";
+import { ConnectionProfile, CompositeSignature } from "./components/ResultInsights";
 import { fetchWithTimeout, geocodePlace, readApiError } from "./lib/api";
 
 type Mode = "natal" | "synastry" | "composite" | "astrocartography";
@@ -157,12 +159,30 @@ export default function App() {
   const [personB, setPersonB] = useState<BirthDraft>(makeBirthDraft());
   const [style, setStyle] = useState("modern");
   const [focus, setFocus] = useState("general");
+  const [orbProfile, setOrbProfile] = useState("standard");
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
+  const [progress, setProgress] = useState({percent:0,label:""});
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [paidOrderToken, setPaidOrderToken] = useState<string | null>(null);
+  const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
 
   const base = IS_DEV ? normalizeBase(apiBase) : DEFAULT_API_BASE;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get("payment");
+    const order = params.get("order");
+    if (payment === "success" && order) {
+      setPaidOrderToken(order);
+      setPaymentNotice("Payment verified ✨ Your premium report is ready to generate and download.");
+    } else if (payment === "failed") {
+      setPaymentNotice("The payment was not completed. No premium report was unlocked.");
+    }
+  }, []);
 
   const title = useMemo(() => ({
     natal: "Birth Chart",
@@ -191,19 +211,36 @@ export default function App() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setProgress({percent:6,label:"Validating your birth data"});
+    let timer: number | undefined;
     try {
+      setProgress({percent:14,label:"Resolving place & historical timezone"});
       const a = await prepareBirth(personA, style, focus);
+      let payloadResult: any;
+      setProgress({percent:32,label:"Calculating planetary positions"});
+      timer = window.setInterval(() => setProgress(prev => ({...prev, percent: Math.min(92, prev.percent + (prev.percent < 65 ? 4 : 1))})), 650);
       if (mode === "natal") {
-        setResult(await postJson("/api/interpret/natal", a));
+        setProgress({percent:48,label:"Calculating houses & aspects"});
+        payloadResult = await postJson("/api/interpret/natal", a);
       } else if (mode === "astrocartography") {
         if (a.time_unknown) throw new Error("Astrocartography needs a known birth time. Uncheck ‘I don’t know my birth time’ to calculate angular lines.");
-        setResult(await postJson("/api/interpret/astrocartography", a));
+        setProgress({percent:52,label:"Tracing angular lines around the world"});
+        payloadResult = await postJson("/api/interpret/astrocartography", a);
       } else {
+        setProgress({percent:28,label:"Preparing both birth charts"});
         const b = await prepareBirth(personB, style, "relationships");
-        const payload = { person_a: a, person_b: b, style };
-        setResult(await postJson(mode === "synastry" ? "/api/interpret/synastry" : "/api/interpret/composite", payload));
+        const payload = { person_a: a, person_b: b, style, orb_profile: orbProfile };
+        setProgress({percent:52,label: mode === "synastry" ? "Comparing inter-chart aspects" : "Building midpoint composite"});
+        payloadResult = await postJson(mode === "synastry" ? "/api/interpret/synastry" : "/api/interpret/composite", payload);
       }
+      if (timer) window.clearInterval(timer);
+      setProgress({percent:96,label:"Finishing your interpretation"});
+      setResult(payloadResult);
+      setProgress({percent:100,label:"Your chart is ready ✨"});
+      window.setTimeout(()=>setProgress({percent:0,label:""}), 900);
     } catch (e: any) {
+      if (timer) window.clearInterval(timer);
+      setProgress({percent:0,label:""});
       setError(e?.name === "AbortError" ? "The request timed out. Please try again." : e?.message || "Unknown error");
     } finally {
       setLoading(false);
@@ -253,6 +290,42 @@ export default function App() {
     }
   }
 
+
+  async function startCheckout(product: "personalized_reading" | "deep_reading", buyer: any, questions: string[]) {
+    setCheckoutBusy(true);
+    setCheckoutError(null);
+    try {
+      const birth = await prepareBirth(personA, style, focus);
+      const data = await postJson("/api/payments/checkout", { product, buyer, birth, questions });
+      if (!data?.payment_page_url || !String(data.payment_page_url).startsWith("https://")) throw new Error("Secure checkout URL was not returned.");
+      window.location.assign(data.payment_page_url);
+    } catch (e:any) {
+      setCheckoutError(e?.message || "Could not start secure checkout.");
+    } finally {
+      setCheckoutBusy(false);
+    }
+  }
+
+  async function downloadPaidOrderReport() {
+    if (!paidOrderToken) return;
+    setPdfLoading(true);
+    setError(null);
+    try {
+      const resp = await fetchWithTimeout(`${base}/api/orders/${encodeURIComponent(paidOrderToken)}/report`, {method:"GET"}, 180000);
+      if (!resp.ok) throw new Error(await readApiError(resp));
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const disposition = resp.headers.get("content-disposition") || "";
+      const match = disposition.match(/filename="?([^";]+)"?/i);
+      a.download = match?.[1] || "astromyla-premium-reading.pdf";
+      document.body.appendChild(a); a.click(); a.remove();
+      window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+    } catch(e:any) { setError(e?.message || "Could not generate premium report."); }
+    finally { setPdfLoading(false); }
+  }
+
   return (
     <div className="appShell">
       <header className="hero">
@@ -280,7 +353,7 @@ export default function App() {
         <div className="sectionHeading">
           <div><h2>{title} ✨</h2><p className="muted">
             {mode === "natal" && "Enter one person’s birth data."}
-            {mode === "synastry" && "Compare two natal charts through cross-chart aspects — no simplistic compatibility score."}
+            {mode === "synastry" && "Compare two natal charts through a bi-wheel, cross-chart aspects and a transparent connection profile."}
             {mode === "composite" && "Build a zodiacal midpoint composite to explore the relationship as a symbolic whole."}
             {mode === "astrocartography" && "Map where natal planets were on the ASC, DSC, MC and IC at the birth moment."}
           </p></div>
@@ -294,6 +367,7 @@ export default function App() {
         <div className="readingPrefs">
           <label>Style<select value={style} onChange={(e) => setStyle(e.target.value)}><option value="modern">Modern</option><option value="traditional">Traditional</option><option value="psychological">Psychological</option></select></label>
           {mode === "natal" && <label>Focus<select value={focus} onChange={(e) => setFocus(e.target.value)}><option value="general">General</option><option value="relationships">Relationships</option><option value="career">Career</option><option value="year_ahead">Year Ahead</option></select></label>}
+          {(mode === "synastry" || mode === "composite") && <label>Aspect orbs<select value={orbProfile} onChange={(e)=>setOrbProfile(e.target.value)}><option value="tight">Tight</option><option value="standard">Standard</option><option value="wide">Wide</option></select></label>}
         </div>
 
         {mode === "astrocartography" && personA.timeUnknown && <div className="warningBox">Astrocartography cannot be calculated reliably without an exact birth time because the angular lines rotate with sidereal time.</div>}
@@ -301,6 +375,7 @@ export default function App() {
         <div className="actions">
           <button onClick={runTool} disabled={loading}>{loading ? "Calculating…" : `Generate ${title}`}</button>
         </div>
+        {loading && progress.percent > 0 && <CalculationProgress percent={progress.percent} label={progress.label} />}
         {error && <p className="error">{error}</p>}
       </section>
 
@@ -323,6 +398,7 @@ export default function App() {
                   aName={personA.name}
                   bName={personB.name}
                 />
+                <ConnectionProfile profile={result.synastry?.connection_profile} />
                 <h3>Cross-chart aspects</h3>
                 <SynastryAspectTable aspects={result.synastry?.aspects || []} aName={personA.name} bName={personB.name} />
                 {(result.synastry?.house_overlays?.a_in_b_houses?.length > 0 || result.synastry?.house_overlays?.b_in_a_houses?.length > 0) && (
@@ -344,12 +420,13 @@ export default function App() {
                     </div>
                   </>
                 )}
-                <p className="muted methodNote">This bi-wheel compares inter-chart aspects and house overlays without reducing the relationship to a compatibility score.</p>
+                <p className="muted methodNote">The profile above measures which relationship themes are most activated. It is not a probability that the relationship will succeed.</p>
               </>
             )}
 
             {mode === "composite" && (
               <>
+                <CompositeSignature signature={result.signature} />
                 <div className="compositeIntro"><strong>About this chart:</strong> Composite planets use zodiacal midpoints. When both birth times are known, midpoint house cusps are included as a symbolic relationship layer.</div>
                 <ChartPanel chart={result.composite} title={`${personA.name || "A"} × ${personB.name || "B"}`} />
               </>
@@ -365,7 +442,9 @@ export default function App() {
         </>
       )}
 
-      <PremiumReadings />
+      {paymentNotice && <section className="card paymentNotice"><strong>{paymentNotice}</strong>{paidOrderToken && <button onClick={downloadPaidOrderReport} disabled={pdfLoading}>{pdfLoading ? "Creating your premium PDF…" : "Download my premium report"}</button>}</section>}
+
+      <PremiumReadings apiBase={base} onCheckout={startCheckout} checkoutBusy={checkoutBusy} checkoutError={checkoutError} />
 
       <footer className="footer"><p>© {new Date().getFullYear()} AstroMYLA</p><p className="muted">Astrology is interpretive and is not scientific or professional advice.</p></footer>
     </div>

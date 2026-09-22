@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.7.0 — Product Polish & Monetization RC
+
+- Fixed mobile birth-form checkbox inflation and narrow-column layout.
+- Added Synastry Connection Profile with six transparent theme dimensions.
+- Added Tight / Standard / Wide relationship orb presets.
+- Added Composite Relationship Identity keywords and strongest signature.
+- Added astrocartography 1–5 theme emphasis guide.
+- Added staged calculation progress UI.
+- Added secure iyzico hosted checkout foundation with server-side prices and verified callback retrieval.
+- Added PostgreSQL-backed production order persistence and paid-report unlock flow.
+- Added four new regression tests; backend total 36/36 PASS.
+
 ## v1.6.0 — Production Release Candidate
 
 ### Birth-data UX

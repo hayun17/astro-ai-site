@@ -1200,3 +1200,135 @@ button.placeSuggestion:focus-visible {
 .astroAngleGuideGrid span { display: block; font-size: 11.5px; line-height: 1.4; }
 .astroWatch { margin-bottom: 0 !important; color: rgba(66,42,80,.72); }
 @media(max-width:640px){ .astroAngleGuideGrid{grid-template-columns:1fr;} }
+
+/* =========================================================
+   v1.7 — mobile polish + result insights + progress + checkout
+   ========================================================= */
+.calcProgress {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(184,145,210,.34);
+  background: rgba(255,255,255,.58);
+  overflow: hidden;
+}
+.calcProgressTop { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:12px; color:#60466f; }
+.calcProgressTop strong { font-size:13px; }
+.calcProgressTrack { height:10px; margin-top:8px; background:rgba(188,169,211,.22); border-radius:999px; overflow:hidden; }
+.calcProgressFill { height:100%; border-radius:inherit; background:linear-gradient(90deg,#ff9ac2,#c8b6ff,#a2d2ff); transition:width .35s ease; box-shadow:0 0 14px rgba(201,157,255,.44); }
+.calcProgressStars { margin-top:4px; text-align:right; font-size:10px; color:rgba(105,71,127,.52); letter-spacing:.18em; }
+
+.insightCard {
+  margin: 14px 0 18px;
+  padding: clamp(14px,2.4vw,22px);
+  border:1px solid rgba(180,140,210,.28);
+  border-radius:20px;
+  background:linear-gradient(145deg,rgba(255,248,252,.84),rgba(247,244,255,.76));
+  box-shadow:0 14px 32px rgba(94,58,120,.09);
+}
+.insightKicker { font-size:11px; font-weight:850; letter-spacing:.08em; text-transform:uppercase; color:#9e5f86; }
+.insightCard h3 { margin:5px 0 7px; font-family:Georgia,"Times New Roman",serif; font-size:clamp(20px,3vw,28px); color:#56376a; }
+.insightCard > p { margin:0 0 14px; line-height:1.55; }
+.scoreGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 16px; }
+.scoreLabel { display:flex; justify-content:space-between; gap:10px; font-size:11.5px; margin-bottom:4px; }
+.scoreLabel b { color:#6e4c82; }
+.scoreTrack { height:8px; border-radius:999px; background:rgba(128,90,150,.12); overflow:hidden; }
+.scoreFill { height:100%; border-radius:inherit; background:linear-gradient(90deg,rgba(255,154,194,.9),rgba(187,161,244,.9)); }
+.score-friction { background:linear-gradient(90deg,rgba(245,180,134,.92),rgba(222,128,150,.92)); }
+.scoreMethod { margin-top:13px; font-size:11px; color:rgba(68,43,82,.70); }
+.scoreMethod summary { margin:0; font-size:11.5px; }
+.scoreMethod p { margin:7px 0 0; line-height:1.5; }
+.keywordChips { display:flex; flex-wrap:wrap; gap:7px; margin:9px 0 11px; }
+.keywordChips span { padding:6px 10px; border-radius:999px; background:rgba(229,211,244,.58); border:1px solid rgba(158,119,184,.20); font-size:11px; font-weight:750; }
+.strongestSignature { padding:10px 12px; border-radius:13px; background:rgba(255,255,255,.64); }
+
+.astroUseGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px 12px; margin:10px 0; }
+.astroUseGrid > div { display:flex; justify-content:space-between; gap:8px; padding:6px 8px; background:rgba(255,255,255,.48); border-radius:10px; font-size:11px; }
+.astroUseGrid b { letter-spacing:.06em; color:#8e628f; white-space:nowrap; }
+
+.paymentNotice { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; }
+.paymentNotice button { flex:0 0 auto; }
+.checkoutOverlay { position:fixed; inset:0; z-index:200; display:grid; place-items:center; padding:18px; background:rgba(39,20,52,.34); backdrop-filter:blur(8px); }
+.checkoutModal { width:min(720px,100%); max-height:min(88vh,820px); overflow:auto; position:relative; padding:22px; border-radius:24px; background:#fffafd; border:1px solid rgba(176,137,196,.30); box-shadow:0 28px 80px rgba(50,24,66,.28); }
+.checkoutClose { position:absolute; right:13px; top:11px; width:38px; height:38px; padding:0; border-radius:50%; background:rgba(239,224,240,.75); box-shadow:none; font-size:24px; }
+.checkoutGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:14px; }
+.checkoutGrid label { display:flex; flex-direction:column; gap:5px; font-size:12px; font-weight:700; color:#5d466a; }
+.checkoutGrid input, .questionFields textarea { width:100%; border:1px solid rgba(200,182,255,.55); border-radius:12px; padding:10px 11px; background:#fff; font-size:15px; }
+.checkoutWide { grid-column:1 / -1; }
+.questionFields { display:grid; gap:8px; margin-top:14px; }
+.questionFields textarea { min-height:74px; resize:vertical; font-family:inherit; }
+.checkoutSubmit { width:100%; margin-top:14px; }
+
+@media (max-width: 640px) {
+  .appShell { padding: 8px; }
+  .hero { padding: 2px 2px 0; }
+  .hero h1 { font-size: 31px; }
+  .hero p { font-size: 12px; line-height: 1.45; }
+  .toolTabs { grid-template-columns: repeat(2,minmax(0,1fr)); gap:6px; padding:6px; border-radius:15px; }
+  .toolTabs button { min-height:42px; padding:8px 6px; font-size:12px; }
+  .card { border-radius:16px; padding:11px; }
+  .birthForm { padding:10px; border-radius:14px; }
+
+  /* Critical v1.7 fix: never let the global 50px mobile input rule inflate checkboxes. */
+  .birthForm input[type="checkbox"],
+  .angleToggles input[type="checkbox"] {
+    width:20px !important;
+    height:20px !important;
+    min-width:20px !important;
+    min-height:20px !important;
+    padding:0 !important;
+    margin:0 !important;
+    flex:0 0 20px !important;
+  }
+
+  /* Do not squeeze a three-part date group beside time on phones. */
+  .birthDateTimeGrid { grid-template-columns:1fr !important; gap:9px; align-items:stretch; }
+  .birthDateTimeGrid .unknownTimeToggle { grid-column:auto !important; }
+  .dateParts { grid-template-columns:.70fr 1.45fr .90fr !important; gap:6px; }
+  .datePart input, .datePart select { min-height:44px !important; height:44px; padding:9px 8px !important; font-size:16px !important; }
+  .datePartMonth select { font-size:14px !important; }
+  .birthForm > .field input,
+  .birthForm > .field select,
+  .birthPrefsGrid input,
+  .birthPrefsGrid select,
+  .birthDateTimeGrid > .field > input {
+    min-height:44px !important;
+    height:44px;
+    padding:9px 11px !important;
+    font-size:16px !important;
+  }
+  .unknownTimeToggle {
+    min-height:32px !important;
+    width:100%;
+    display:flex !important;
+    flex-direction:row !important;
+    align-items:center !important;
+    gap:9px !important;
+    padding:2px 1px !important;
+    margin:0 !important;
+    font-size:13px !important;
+    line-height:1.3;
+  }
+  .unknownTimeToggle span { display:block; min-width:0; overflow-wrap:normal; word-break:normal; }
+  .birthPrefsGrid { grid-template-columns:1fr !important; gap:8px; }
+  .readingPrefs { grid-template-columns:1fr !important; }
+  .dualBirthForms { grid-template-columns:1fr !important; }
+  .manualGrid { grid-template-columns:1fr !important; }
+  .placeSuggestion { min-height:48px !important; }
+  .help { font-size:11px; }
+  .geoAttribution { font-size:9.5px; }
+
+  .scoreGrid { grid-template-columns:1fr; }
+  .astroUseGrid { grid-template-columns:1fr; }
+  .paymentNotice { align-items:stretch; flex-direction:column; }
+  .paymentNotice button { width:100%; }
+  .checkoutOverlay { padding:8px; place-items:end center; }
+  .checkoutModal { max-height:92vh; border-radius:22px 22px 14px 14px; padding:18px 14px 16px; }
+  .checkoutGrid { grid-template-columns:1fr; }
+  .checkoutWide { grid-column:auto; }
+}
+
+@media (max-width: 380px) {
+  .dateParts { grid-template-columns:.72fr 1.35fr .92fr !important; }
+  .datePart input, .datePart select { padding-left:6px !important; padding-right:6px !important; }
+}

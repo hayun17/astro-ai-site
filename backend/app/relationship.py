@@ -45,7 +45,7 @@ def _eligible_objects(chart: Dict[str, Any], prefix: str) -> Dict[str, Dict[str,
     return out
 
 
-def compute_cross_aspects(chart_a: Dict[str, Any], chart_b: Dict[str, Any]) -> List[Dict[str, Any]]:
+def compute_cross_aspects(chart_a: Dict[str, Any], chart_b: Dict[str, Any], orb_scale: float = 1.0) -> List[Dict[str, Any]]:
     a = _eligible_objects(chart_a, "A")
     b = _eligible_objects(chart_b, "B")
     out: List[Dict[str, Any]] = []
@@ -55,7 +55,7 @@ def compute_cross_aspects(chart_a: Dict[str, Any], chart_b: Dict[str, Any]) -> L
             sep = angular_separation(float(obj_a["lon"]), float(obj_b["lon"]))
             for aspect_name, exact in ASPECTS.items():
                 orb = abs(sep - exact)
-                if orb <= SYNASTRY_ORBS[aspect_name]:
+                if orb <= SYNASTRY_ORBS[aspect_name] * max(0.5, min(1.5, float(orb_scale))):
                     out.append({
                         "a": obj_a["name"],
                         "b": obj_b["name"],
@@ -413,3 +413,168 @@ def build_composite_interpretation(composite: Dict[str, Any], label: str = "Rela
     ])
     return "\n".join(lines)
 
+
+
+# ---------------------------------------------------------------------------
+# v1.7 relationship result summaries
+# ---------------------------------------------------------------------------
+_BODY_CATEGORY_WEIGHT = {
+    "Sun": {"growth": 1.1, "stability": 0.5},
+    "Moon": {"emotional": 1.6, "stability": 0.6},
+    "Mercury": {"communication": 1.7},
+    "Venus": {"chemistry": 1.4, "emotional": 0.7},
+    "Mars": {"chemistry": 1.5, "friction": 0.8},
+    "Jupiter": {"growth": 1.5, "emotional": 0.3},
+    "Saturn": {"stability": 1.7, "friction": 0.7},
+    "Uranus": {"growth": 0.6, "friction": 1.0},
+    "Neptune": {"emotional": 0.6, "friction": 0.5},
+    "Pluto": {"chemistry": 0.8, "growth": 0.8, "friction": 1.0},
+    "Asc": {"chemistry": 0.7, "emotional": 0.3},
+    "DSC": {"chemistry": 0.7, "stability": 0.4},
+    "MC": {"growth": 0.3},
+    "IC": {"emotional": 0.9},
+    "Vertex": {"growth": 0.4},
+}
+
+_ASPECT_CATEGORY_FACTOR = {
+    "Conjunction": {"support": 0.72, "friction": 0.45},
+    "Opposition": {"support": 0.38, "friction": 0.95},
+    "Trine": {"support": 1.0, "friction": 0.08},
+    "Square": {"support": 0.25, "friction": 1.0},
+    "Sextile": {"support": 0.82, "friction": 0.08},
+}
+
+
+def _orb_strength(aspect: Dict[str, Any]) -> float:
+    name = str(aspect.get("aspect") or "")
+    max_orb = max(0.1, float(SYNASTRY_ORBS.get(name, 5.0)))
+    orb = max(0.0, float(aspect.get("orb") or 0.0))
+    # Exact contacts receive 1.0; contacts at the configured edge receive 0.15.
+    return max(0.15, 1.0 - 0.85 * min(1.0, orb / max_orb))
+
+
+def build_connection_profile(aspects: List[Dict[str, Any]], overlays: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    """Create an interpretable synastry profile, not a fate/compatibility score.
+
+    Values describe how strongly each *theme* is activated by the configured
+    aspect set. They are deliberately not a probability that a relationship
+    will succeed. Tight aspects and relationship-relevant bodies carry more
+    weight, while hard aspects increase the friction dimension rather than
+    simply being labelled 'bad'.
+    """
+    categories = {k: {"positive": 0.0, "capacity": 0.0} for k in ["emotional", "communication", "chemistry", "stability", "growth", "friction"]}
+
+    for a in aspects:
+        body_a, body_b = str(a.get("a") or ""), str(a.get("b") or "")
+        tone = _ASPECT_CATEGORY_FACTOR.get(str(a.get("aspect") or ""), {"support": 0.5, "friction": 0.4})
+        strength = _orb_strength(a)
+        merged: Dict[str, float] = {}
+        for body in (body_a, body_b):
+            for cat, val in _BODY_CATEGORY_WEIGHT.get(body, {}).items():
+                merged[cat] = merged.get(cat, 0.0) + float(val)
+        if not merged:
+            merged = {"growth": 0.25}
+
+        for cat, weight in merged.items():
+            if cat == "friction":
+                categories["friction"]["positive"] += weight * strength * max(0.35, tone["friction"])
+                categories["friction"]["capacity"] += weight
+            else:
+                categories[cat]["positive"] += weight * strength * tone["support"]
+                categories[cat]["capacity"] += weight
+                # A tense contact in an important category also contributes to friction.
+                if tone["friction"] > 0.4:
+                    categories["friction"]["positive"] += weight * strength * tone["friction"] * 0.42
+                    categories["friction"]["capacity"] += weight * 0.42
+
+    # House overlays add thematic emphasis without pretending to be aspects.
+    for direction in ((overlays or {}).get("a_in_b_houses") or []) + ((overlays or {}).get("b_in_a_houses") or []):
+        house = int(direction.get("house") or 0)
+        planet = str(direction.get("planet") or "")
+        boost = 0.18
+        if house in {4, 8, 12}: categories["emotional"]["positive"] += boost
+        if house in {5, 7, 8}: categories["chemistry"]["positive"] += boost
+        if house in {3, 9}: categories["communication"]["positive"] += boost * 0.8
+        if house in {2, 6, 7, 10}: categories["stability"]["positive"] += boost * 0.7
+        if house in {1, 5, 9, 11}: categories["growth"]["positive"] += boost * 0.7
+
+    scores: Dict[str, int] = {}
+    for cat, data in categories.items():
+        # Compress into a readable 35-95 band. With no contacts, return 50 rather than false precision.
+        if data["capacity"] <= 0 and data["positive"] <= 0:
+            scores[cat] = 50
+            continue
+        normalized = data["positive"] / max(0.8, data["capacity"])
+        scores[cat] = int(round(max(20.0, min(95.0, 34.0 + 68.0 * normalized))))
+
+    # Derive keywords from the strongest measured themes.
+    label_map = {
+        "emotional": "Emotionally Resonant",
+        "communication": "Mentally Connected",
+        "chemistry": "Magnetic",
+        "stability": "Grounding",
+        "growth": "Growth-Oriented",
+        "friction": "High-Voltage",
+    }
+    ranked = sorted(scores, key=lambda k: scores[k], reverse=True)
+    keywords = [label_map[k] for k in ranked[:3]]
+
+    # A compact, deterministic summary sentence.
+    primary, secondary = ranked[:2]
+    challenge = "friction" if scores["friction"] >= 66 else ranked[-1]
+    summary = (
+        f"This connection is most strongly marked by {label_map[primary].lower()} and {label_map[secondary].lower()} themes. "
+        + ("There is also a noticeable amount of activating friction, so chemistry and challenge may arrive together."
+           if challenge == "friction" else f"The quieter area is {label_map[challenge].lower()}, which may need more conscious attention than the stronger themes.")
+    )
+
+    strongest = sorted(aspects, key=lambda x: (float(x.get("orb") or 999.0), x.get("a", ""), x.get("b", "")))[:5]
+    return {
+        "scores": scores,
+        "keywords": keywords,
+        "summary": summary,
+        "strongest_aspects": strongest,
+        "method_note": (
+            "Theme scores summarize weighted synastry activity from major inter-chart aspects and available house overlays. "
+            "They are not probabilities of relationship success or failure. Tight contacts count more; hard contacts raise the friction dimension rather than being treated as simply negative."
+        ),
+    }
+
+
+def build_composite_signature(composite: Dict[str, Any]) -> Dict[str, Any]:
+    planets = composite.get("planets") or {}
+    aspects = (composite.get("aspects") or {}).get("planet_aspects") or []
+    keywords: List[str] = []
+
+    sun_sign = str((planets.get("Sun") or {}).get("sign") or "")
+    moon_sign = str((planets.get("Moon") or {}).get("sign") or "")
+    venus_sign = str((planets.get("Venus") or {}).get("sign") or "")
+    sign_keywords = {
+        "Aries": "Bold", "Taurus": "Steady", "Gemini": "Curious", "Cancer": "Protective",
+        "Leo": "Expressive", "Virgo": "Intentional", "Libra": "Relational", "Scorpio": "Intense",
+        "Sagittarius": "Exploratory", "Capricorn": "Purposeful", "Aquarius": "Independent", "Pisces": "Imaginative",
+    }
+    for sign in (sun_sign, moon_sign, venus_sign):
+        word = sign_keywords.get(sign)
+        if word and word not in keywords:
+            keywords.append(word)
+
+    strongest = sorted(aspects, key=lambda x: float(x.get("orb") or 999.0))[:4]
+    for a in strongest:
+        pair = {str(a.get("p1")), str(a.get("p2"))}
+        if {"Venus", "Mars"}.issubset(pair) and "Magnetic" not in keywords: keywords.append("Magnetic")
+        if "Saturn" in pair and "Enduring" not in keywords: keywords.append("Structured")
+        if "Jupiter" in pair and "Expansive" not in keywords: keywords.append("Expansive")
+        if "Pluto" in pair and "Transformative" not in keywords: keywords.append("Transformative")
+        if "Uranus" in pair and "Unconventional" not in keywords: keywords.append("Unconventional")
+        if "Neptune" in pair and "Dreamy" not in keywords: keywords.append("Dreamy")
+
+    keywords = keywords[:4] or ["Layered", "Evolving"]
+    strongest_aspect = strongest[0] if strongest else None
+    summary = " · ".join(keywords[:3])
+    return {
+        "keywords": keywords,
+        "headline": summary,
+        "strongest_aspect": strongest_aspect,
+        "method_note": "This signature is a descriptive summary of the midpoint composite placements and its tightest major aspects, not a relationship outcome score.",
+    }

@@ -34,6 +34,19 @@ const ANGLE_GUIDE: Record<string, string> = {
   IC: "The planet is felt more privately through home, family, roots, rest and emotional foundations.",
 };
 
+const PLANET_SCORES: Record<string, Record<string, number>> = {
+  Sun: {Career:5, Love:3, Home:2, Creativity:4, Intensity:3},
+  Moon: {Career:2, Love:4, Home:5, Creativity:3, Intensity:4},
+  Mercury: {Career:4, Love:2, Home:2, Creativity:4, Intensity:2},
+  Venus: {Career:4, Love:5, Home:3, Creativity:5, Intensity:2},
+  Mars: {Career:4, Love:3, Home:2, Creativity:3, Intensity:5},
+  Jupiter: {Career:5, Love:4, Home:3, Creativity:4, Intensity:2},
+  Saturn: {Career:5, Love:2, Home:3, Creativity:2, Intensity:4},
+  Uranus: {Career:3, Love:2, Home:1, Creativity:5, Intensity:4},
+  Neptune: {Career:2, Love:4, Home:3, Creativity:5, Intensity:4},
+  Pluto: {Career:4, Love:3, Home:2, Creativity:3, Intensity:5},
+};
+
 const COLORS: Record<string, string> = {
   Sun: "#d07a24",
   Moon: "#6b78a8",
@@ -126,6 +139,11 @@ export default function AstrocartographyMap({ data }: Props) {
         <div className="astroAngleGuideGrid">
           {(["ASC", "DSC", "MC", "IC"] as const).map((angle) => (
             <div key={angle} className={angles[angle] ? "active" : ""}><b>{planet}–{angle}</b><span>{ANGLE_GUIDE[angle]}</span></div>
+          ))}
+        </div>
+        <div className="astroUseGrid" aria-label={`${planet} line themes`}>
+          {Object.entries(PLANET_SCORES[planet] || {}).map(([label, score]) => (
+            <div key={label}><span>{label}</span><b>{"●".repeat(score)}{"○".repeat(5-score)}</b></div>
           ))}
         </div>
         <p className="astroWatch"><b>Worth watching:</b> {PLANET_GUIDE[planet]?.watch}.</p>

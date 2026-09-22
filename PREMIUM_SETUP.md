@@ -1,3 +1,5 @@
+> **v1.7 note:** The active premium checkout architecture is now the server-side iyzico hosted-checkout flow documented in `PAYMENT_SETUP_V1_7.md`. Older external checkout-link environment variables in this historical document are no longer the preferred production path.
+
 # Premium Readings Setup - v1.6.0
 
 AstroMYLA now separates **selling a reading** from **generating the paid report**.

@@ -7,6 +7,7 @@ import secrets
 import threading
 import time
 from datetime import datetime
+from decimal import Decimal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from collections import defaultdict, deque
 from typing import Any
@@ -15,25 +16,28 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from .chart import ChartComputationError, compute_natal_chart, compute_object_house
 from .llm import generate_interpretation, generate_with_fallback, generate_strict
-from .models import BirthData, PremiumNatalReportRequest, RelationshipRequest, ReportRequest
+from .models import BirthData, PremiumNatalReportRequest, RelationshipRequest, ReportRequest, CheckoutRequest
 from .rag import build_index, exact_passage, retrieve, rule_passages
 from .relationship import (
     build_composite_interpretation,
     build_synastry_interpretation,
     compute_composite_chart,
     compute_cross_aspects,
+    build_connection_profile,
+    build_composite_signature,
 )
 from .astrocartography import build_astrocartography_interpretation, compute_astrocartography
 from .pdf_report import build_report_pdf
 from .premium import premium_prompt
+from .payment import (OrderStore, PaymentConfigurationError, PaymentProviderError, PRODUCTS, initialize_checkout, payment_ready, public_catalog, retrieve_checkout, _price_for)
 
 load_dotenv()
 
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.7.0"
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production").lower()
 EXPOSE_DEBUG_DATA = os.getenv("EXPOSE_DEBUG_DATA", "false").lower() in {"1", "true", "yes", "on"}
 PREMIUM_REPORT_TOKEN = os.getenv("PREMIUM_REPORT_TOKEN", "").strip()
@@ -463,18 +467,25 @@ def interpret_natal(birth: BirthData, request: Request):
     return response
 
 
+
+
+def _relationship_orb_scale(profile: str) -> float:
+    return {"tight": 0.70, "standard": 1.0, "wide": 1.25}.get(profile, 1.0)
+
 @app.post("/api/chart/synastry")
 def synastry_chart(payload: RelationshipRequest, request: Request):
     _enforce_rate_limit(request)
     chart_a = _compute_chart(payload.person_a)
     chart_b = _compute_chart(payload.person_b)
-    aspects = compute_cross_aspects(chart_a, chart_b)
+    aspects = compute_cross_aspects(chart_a, chart_b, _relationship_orb_scale(payload.orb_profile))
     overlays = _relationship_overlays(chart_a, payload.person_a, chart_b, payload.person_b)
     return {
         "person_a": chart_a,
         "person_b": chart_b,
         "aspects": aspects,
         "house_overlays": overlays,
+        "connection_profile": build_connection_profile(aspects, overlays),
+        "orb_profile": payload.orb_profile,
         "method_note": "Cross-chart major aspects. Unknown-time Moon/angle contacts are omitted instead of guessed.",
     }
 
@@ -484,7 +495,7 @@ def interpret_synastry(payload: RelationshipRequest, request: Request):
     _enforce_rate_limit(request)
     chart_a = _compute_chart(payload.person_a)
     chart_b = _compute_chart(payload.person_b)
-    aspects = compute_cross_aspects(chart_a, chart_b)
+    aspects = compute_cross_aspects(chart_a, chart_b, _relationship_orb_scale(payload.orb_profile))
     overlays = _relationship_overlays(chart_a, payload.person_a, chart_b, payload.person_b)
     fallback = build_synastry_interpretation(chart_a, chart_b, aspects, overlays)
     facts = {
@@ -492,6 +503,7 @@ def interpret_synastry(payload: RelationshipRequest, request: Request):
         "person_b": _chart_for_model(chart_b),
         "cross_aspects": aspects[:40],
         "house_overlays": overlays,
+        "connection_profile": build_connection_profile(aspects, overlays),
     }
     interpretation = generate_with_fallback(
         system_prompt=(
@@ -511,6 +523,8 @@ def interpret_synastry(payload: RelationshipRequest, request: Request):
             "person_b": chart_b,
             "aspects": aspects,
             "house_overlays": overlays,
+            "connection_profile": build_connection_profile(aspects, overlays),
+            "orb_profile": payload.orb_profile,
             "method_note": "Cross-chart major aspects plus partner-planet house overlays when the receiving chart has a known birth time. Unknown-time Moon/angle contacts are omitted instead of guessed.",
         },
         "interpretation": interpretation,
@@ -523,7 +537,7 @@ def composite_chart(payload: RelationshipRequest, request: Request):
     chart_a = _compute_chart(payload.person_a)
     chart_b = _compute_chart(payload.person_b)
     composite = compute_composite_chart(chart_a, chart_b)
-    return {"person_a": chart_a, "person_b": chart_b, "composite": composite}
+    return {"person_a": chart_a, "person_b": chart_b, "composite": composite, "signature": build_composite_signature(composite)}
 
 
 @app.post("/api/interpret/composite")
@@ -550,6 +564,7 @@ def interpret_composite(payload: RelationshipRequest, request: Request):
         "person_a": chart_a,
         "person_b": chart_b,
         "composite": composite,
+        "signature": build_composite_signature(composite),
         "interpretation": interpretation,
     }
 
@@ -597,6 +612,42 @@ def interpret_astrocartography(birth: BirthData, request: Request):
     }
 
 
+
+
+def _build_premium_natal_pdf(payload: PremiumNatalReportRequest) -> tuple[bytes, str]:
+    chart = _compute_chart(payload.birth)
+    query = build_rag_query(chart)
+    retrieved = retrieve(query, k=48)
+    exact = _exact_context(chart)
+    rules = rule_passages()
+    passages = _merge_unique_passages(rules, exact, retrieved)
+    chart_for_model = _chart_for_model(chart)
+    system_prompt, user_prompt, max_tokens = premium_prompt(
+        chart=chart_for_model,
+        tier=payload.tier,
+        style=payload.birth.style,
+        focus=payload.birth.focus,
+        questions=payload.questions,
+    )
+    interpretation = generate_strict(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        retrieved_passages=passages,
+        max_tokens=max_tokens,
+    )
+    label = "Deep Personal Reading" if payload.tier == "deep" else "Personalized Reading"
+    title = f"AstroMYLA {label} - {payload.birth.name or 'Natal Chart'}"
+    content = build_report_pdf(
+        kind="natal",
+        title=title,
+        data={"chart": chart, "premium": {"tier": payload.tier, "questions": payload.questions}},
+        interpretation=interpretation,
+        tier=payload.tier,
+    )
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "-", payload.birth.name or "reading").strip("-")
+    filename = f"astromyla-{payload.tier}-{safe_name or 'reading'}.pdf"
+    return content, filename
+
 @app.post("/api/premium/natal-report")
 def premium_natal_report(
     payload: PremiumNatalReportRequest,
@@ -616,49 +667,136 @@ def premium_natal_report(
         if not x_premium_token or not secrets.compare_digest(x_premium_token, PREMIUM_REPORT_TOKEN):
             raise HTTPException(status_code=403, detail="Unauthorized")
 
-    chart = _compute_chart(payload.birth)
-    query = build_rag_query(chart)
-    retrieved = retrieve(query, k=48)
-    exact = _exact_context(chart)
-    rules = rule_passages()
-    passages = _merge_unique_passages(rules, exact, retrieved)
-
-    chart_for_model = _chart_for_model(chart)
-    system_prompt, user_prompt, max_tokens = premium_prompt(
-        chart=chart_for_model,
-        tier=payload.tier,
-        style=payload.birth.style,
-        focus=payload.birth.focus,
-        questions=payload.questions,
-    )
     try:
-        interpretation = generate_strict(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            retrieved_passages=passages,
-            max_tokens=max_tokens,
-        )
-        label = "Deep Personal Reading" if payload.tier == "deep" else "Personalized Reading"
-        title = f"AstroMYLA {label} - {payload.birth.name or 'Natal Chart'}"
-        content = build_report_pdf(
-            kind="natal",
-            title=title,
-            data={"chart": chart, "premium": {"tier": payload.tier, "questions": payload.questions}},
-            interpretation=interpretation,
-            tier=payload.tier,
-        )
+        content, filename = _build_premium_natal_pdf(payload)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Could not generate premium PDF report.") from exc
 
-    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "-", payload.birth.name or "reading").strip("-")
-    filename = f"astromyla-{payload.tier}-{safe_name or 'reading'}.pdf"
     return Response(
         content=content,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+
+
+@app.get("/api/payments/config")
+def payments_config():
+    return {"provider": "iyzico", "ready": payment_ready(), "products": public_catalog()}
+
+
+@app.post("/api/payments/checkout")
+def create_payment_checkout(payload: CheckoutRequest, request: Request):
+    _enforce_rate_limit(request)
+    if ENVIRONMENT != "development" and not payment_ready():
+        raise HTTPException(status_code=503, detail="Secure checkout is not configured yet.")
+    try:
+        meta = PRODUCTS[payload.product]
+        price = _price_for(payload.product)
+        store = OrderStore()
+        order = store.create(
+            product=payload.product,
+            tier=str(meta["tier"]),
+            amount=f"{price:.2f}",
+            email=payload.buyer.email,
+            request_payload={
+                "birth": payload.birth.model_dump(mode="json"),
+                "questions": payload.questions,
+                "tier": meta["tier"],
+            },
+        )
+        callback_base = os.getenv("PUBLIC_API_BASE_URL", "https://astromyla.onrender.com").rstrip("/")
+        callback_url = f"{callback_base}/api/payments/iyzico/callback?order={order.id}"
+        iyzi = initialize_checkout(
+            order=order,
+            buyer=payload.buyer.model_dump(mode="json"),
+            client_ip=_client_key(request),
+            callback_url=callback_url,
+        )
+        token = str(iyzi.get("token") or "")
+        page = str(iyzi.get("paymentPageUrl") or "")
+        if not token or not page.startswith("https://"):
+            raise PaymentProviderError("iyzico did not return a secure checkout URL")
+        store.set_payment_token(order.id, token)
+        return {"order_token": order.public_token, "payment_page_url": page}
+    except (PaymentConfigurationError, PaymentProviderError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/payments/iyzico/callback")
+async def iyzico_callback(request: Request):
+    raw = (await request.body()).decode("utf-8", errors="replace")
+    from urllib.parse import parse_qs
+    form = parse_qs(raw)
+    token = (form.get("token") or [""])[0]
+    order_id = request.query_params.get("order", "")
+    site = os.getenv("PUBLIC_SITE_URL", "https://astromyla.com").rstrip("/")
+    if not token or not order_id:
+        return RedirectResponse(f"{site}/?payment=failed", status_code=303)
+    try:
+        store = OrderStore()
+        order = store.get_id(order_id)
+        if not order or order.payment_token != token:
+            raise PaymentProviderError("Order/token mismatch")
+        response = retrieve_checkout(token=token, conversation_id=order.id)
+        paid = str(response.get("paymentStatus") or "").upper() == "SUCCESS" and str(response.get("basketId") or "") == order.id
+        if paid:
+            # Amount and currency are verified against the server-side order before fulfillment.
+            if str(response.get("currency") or "") != order.currency or Decimal(str(response.get("paidPrice"))) != Decimal(order.amount):
+                raise PaymentProviderError("Verified payment amount did not match the order")
+            store.mark_paid(order.id, str(response.get("paymentId") or ""))
+            return RedirectResponse(f"{site}/?payment=success&order={order.public_token}", status_code=303)
+        store.mark_failed(order.id)
+    except Exception:
+        pass
+    return RedirectResponse(f"{site}/?payment=failed", status_code=303)
+
+
+@app.get("/api/orders/{public_token}")
+def order_status(public_token: str, request: Request):
+    _enforce_rate_limit(request)
+    try:
+        order = OrderStore().get_public(public_token)
+    except PaymentConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return {"status": order.status, "product": order.product, "amount": order.amount, "currency": order.currency, "report_ready": order.status == "paid"}
+
+
+@app.get("/api/orders/{public_token}/report")
+def paid_order_report(public_token: str, request: Request):
+    _enforce_rate_limit(request)
+    try:
+        order = OrderStore().get_public(public_token)
+    except PaymentConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status != "paid":
+        raise HTTPException(status_code=403, detail="Payment has not been verified.")
+    store = OrderStore()
+    cached = store.get_report(order.id)
+    if cached:
+        content, filename = cached
+    else:
+        try:
+            saved = json.loads(order.request_json)
+            payload = PremiumNatalReportRequest(
+                birth=BirthData(**saved["birth"]),
+                tier=saved["tier"],
+                questions=saved.get("questions") or [],
+            )
+            content, filename = _build_premium_natal_pdf(payload)
+            store.save_report(order.id, content, filename)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail="Could not generate paid report.") from exc
+    return Response(content=content, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @app.post("/api/report/pdf")

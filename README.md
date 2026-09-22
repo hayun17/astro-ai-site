@@ -1,3 +1,11 @@
+# AstroMYLA v1.7.0 — Product Polish & Monetization RC
+
+This release builds on the verified v1.6 production release. It fixes the mobile birth-data layout, adds transparent relationship theme scoring, composite identity summaries, astrocartography emphasis guides, visible calculation progress, relationship orb presets, and an iyzico hosted-checkout foundation for premium reports.
+
+See `V1_7_AUDIT.md`, `PRODUCT_ROADMAP.md`, and `PAYMENT_SETUP_V1_7.md` for details.
+
+---
+
 # AstroMYLA v1.6.0 — Production Release Candidate
 
 AstroMYLA is a responsive astrology web application for natal charts, synastry, composite charts, astrocartography, downloadable reports, and protected premium natal reports.

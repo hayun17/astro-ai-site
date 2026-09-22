@@ -44,6 +44,7 @@ class RelationshipRequest(BaseModel):
     person_a: BirthData
     person_b: BirthData
     style: InterpretationStyle = "modern"
+    orb_profile: Literal["tight", "standard", "wide"] = "standard"
 
 
 class ReportRequest(BaseModel):
@@ -82,4 +83,28 @@ class PremiumNatalReportRequest(BaseModel):
             if q2:
                 cleaned.append(q2)
         self.questions = cleaned[:3]
+        return self
+
+
+class CheckoutBuyer(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    full_name: str = Field(min_length=2, max_length=120)
+    email: str = Field(min_length=5, max_length=200)
+    phone: str = Field(min_length=7, max_length=32)
+    identity_number: str = Field(min_length=5, max_length=32)
+    address: str = Field(min_length=5, max_length=300)
+    city: str = Field(min_length=2, max_length=100)
+    country: str = Field(default="Turkey", min_length=2, max_length=100)
+
+
+class CheckoutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    product: Literal["personalized_reading", "deep_reading"]
+    buyer: CheckoutBuyer
+    birth: BirthData
+    questions: list[str] = Field(default_factory=list, max_length=3)
+
+    @model_validator(mode="after")
+    def clean_checkout_questions(self) -> "CheckoutRequest":
+        self.questions = [" ".join(str(q).split())[:500] for q in self.questions if " ".join(str(q).split())][:3]
         return self

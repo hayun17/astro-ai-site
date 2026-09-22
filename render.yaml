@@ -25,6 +25,22 @@ services:
         value: "1000000"
       - key: ALLOWED_HOSTS
         value: "astromyla.onrender.com"
+      - key: PUBLIC_API_BASE_URL
+        value: https://astromyla.onrender.com
+      - key: PUBLIC_SITE_URL
+        value: https://astromyla.com
+      - key: IYZICO_API_KEY
+        sync: false
+      - key: IYZICO_SECRET_KEY
+        sync: false
+      - key: IYZICO_BASE_URL
+        value: https://sandbox-api.iyzipay.com
+      - key: PAID_READING_PRICE_TRY
+        sync: false
+      - key: DEEP_READING_PRICE_TRY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
 
   - type: web
     runtime: static
