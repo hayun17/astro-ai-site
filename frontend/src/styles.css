@@ -28,7 +28,7 @@ body {
   margin: 0;
 
   background-image:
-    url("/cosmic-sweetness.png"),
+    url("/cosmic-sweetness.webp"),
     radial-gradient(1200px 700px at 12% 10%, rgba(255,154,194,0.12), transparent 60%),
     radial-gradient(1100px 700px at 88% 15%, rgba(162,210,255,0.12), transparent 60%),
     radial-gradient(1000px 700px at 45% 92%, rgba(200,182,255,0.20), transparent 60%),
@@ -432,3 +432,771 @@ details summary {
   font-size: 9.5px;
   opacity: 0.65;
 }
+/* =========================================================
+   v1.2.1 — mobile birth-data UX
+   ========================================================= */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+.form input,
+.form select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.help {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(43,27,59,0.64);
+  overflow-wrap: anywhere;
+}
+
+.birthHint {
+  margin: -2px 0 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(43,27,59,0.64);
+}
+
+button {
+  touch-action: manipulation;
+}
+
+@media (max-width: 640px) {
+  body {
+    background-attachment: scroll;
+  }
+
+  .page {
+    padding: 10px;
+  }
+
+  .header {
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-size: 31px;
+    line-height: 1.08;
+  }
+
+  .sub {
+    font-size: 12px;
+  }
+
+  .card {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .card h2 {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+
+  .form label {
+    gap: 7px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  /* 16px prevents iOS Safari from zooming the whole page on focus. */
+  .form input,
+  .form select,
+  .api input {
+    min-height: 50px;
+    padding: 12px 13px;
+    border-radius: 14px;
+    font-size: 16px;
+    line-height: 1.2;
+  }
+
+  /* Let phones use their native select UI rather than the tiny desktop arrow. */
+  .form select {
+    appearance: auto;
+    -webkit-appearance: menulist;
+    -moz-appearance: auto;
+    background-image: none;
+    padding-right: 12px;
+  }
+
+  /* Date + time stay side-by-side on normal phones; UTC gets a full row. */
+  .birthDateTimeRow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .birthDateTimeRow .utcField {
+    grid-column: 1 / -1;
+  }
+
+  .birthHint {
+    margin-top: -4px;
+    margin-bottom: 14px;
+    font-size: 12px;
+  }
+
+  .help {
+    font-size: 12px;
+  }
+
+  .preferencesRow {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .advanced summary {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px 2px;
+    font-size: 13px;
+  }
+
+  .actions {
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .actions button {
+    width: 100%;
+    min-height: 50px;
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .error,
+  .muted {
+    font-size: 12.5px;
+  }
+}
+
+@media (max-width: 380px) {
+  .birthDateTimeRow {
+    grid-template-columns: 1fr;
+  }
+
+  .birthDateTimeRow .utcField {
+    grid-column: auto;
+  }
+}
+
+/* =========================================================
+   v1.2.2 — smart birthplace search + unknown-time mode
+   ========================================================= */
+.form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(43,27,59,0.86);
+  margin-bottom: 10px;
+}
+
+.fieldLabel {
+  font: inherit;
+  font-weight: inherit;
+}
+
+.unknownTimeChoice {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  margin: 2px 0 0 !important;
+  min-height: 28px;
+  font-size: 12px !important;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.unknownTimeChoice input[type="checkbox"] {
+  width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  margin: 0;
+  padding: 0;
+  accent-color: #ff9ac2;
+  flex: 0 0 auto;
+}
+
+.fieldNote,
+.geoAttribution {
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: rgba(43,27,59,0.56);
+}
+
+.placeSearchWrap {
+  position: relative;
+  width: 100%;
+}
+
+.placeSuggestions {
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  overflow: hidden;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid rgba(200,182,255,0.62);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.98);
+  box-shadow: 0 16px 34px rgba(65, 35, 95, 0.18);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+button.placeSuggestion {
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 11px 13px;
+  border-radius: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(120,70,120,0.08);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  text-align: left;
+  font-weight: 650;
+}
+
+button.placeSuggestion:last-child {
+  border-bottom: 0;
+}
+
+button.placeSuggestion:hover,
+button.placeSuggestion:focus-visible {
+  transform: none;
+  box-shadow: none;
+  background: rgba(255,154,194,0.10);
+  outline: none;
+}
+
+.placeSuggestionName {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.placeSuggestionMeta {
+  font-size: 10.5px;
+  font-weight: 550;
+  opacity: 0.62;
+}
+
+.timeUnknownNotice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 2px 0 10px;
+  padding: 10px 12px;
+  border-radius: 13px;
+  border: 1px solid rgba(255,154,194,0.35);
+  background: rgba(255,245,250,0.78);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.timeUnknownNotice strong {
+  color: #6a3d73;
+}
+
+@media (max-width: 640px) {
+  .form .field {
+    gap: 7px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  .unknownTimeChoice {
+    min-height: 38px;
+    font-size: 13px !important;
+    padding: 2px 1px;
+  }
+
+  .placeSuggestions {
+    max-height: min(44vh, 330px);
+    border-radius: 14px;
+  }
+
+  button.placeSuggestion {
+    min-height: 54px;
+    padding: 10px 12px;
+  }
+
+  .placeSuggestionName {
+    font-size: 14px;
+  }
+
+  .placeSuggestionMeta,
+  .geoAttribution,
+  .fieldNote {
+    font-size: 11px;
+  }
+
+  .timeUnknownNotice {
+    font-size: 12px;
+  }
+}
+.form input:disabled,
+.form select:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+/* =========================================================
+   v1.3.0 — multi-tool astrology suite
+   ========================================================= */
+.appShell {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 22px;
+}
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+.hero h1 { margin: 0; }
+.hero p { margin: 6px 0 0; max-width: 760px; color: rgba(43,27,59,.72); }
+.devApiField { display: flex; flex-direction: column; gap: 5px; font-size: 11px; min-width: 300px; }
+
+.toolTabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 7px;
+  border: 1px solid rgba(200,182,255,.4);
+  background: rgba(255,255,255,.48);
+  border-radius: 18px;
+  backdrop-filter: blur(10px);
+}
+.toolTabs button {
+  box-shadow: none;
+  background: rgba(255,255,255,.5);
+  border: 1px solid transparent;
+  min-height: 44px;
+}
+.toolTabs button.active {
+  background: linear-gradient(135deg, rgba(255,154,194,.88), rgba(191,168,255,.88));
+  border-color: rgba(255,255,255,.65);
+  box-shadow: 0 8px 18px rgba(138,94,177,.18);
+}
+
+.inputCard, .results, .interpretationCard { margin-top: 14px; }
+.sectionHeading, .resultHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sectionHeading p { margin: 0 0 12px; }
+.resultHeader { margin-bottom: 10px; }
+.resultHeader h2 { margin: 0; }
+
+.singleBirthForm { max-width: 980px; margin: 0 auto; }
+.dualBirthForms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 14px;
+  align-items: start;
+}
+.birthForm {
+  padding: 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(200,182,255,.38);
+  background: rgba(255,255,255,.34);
+}
+.birthForm h3 { margin: 0 0 10px; font-size: 15px; }
+.birthForm label, .birthForm .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(43,27,59,.86);
+}
+.birthForm .fieldWide { margin-bottom: 10px; }
+.birthDateTimeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+.unknownTimeToggle {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px !important;
+  min-height: 38px;
+  cursor: pointer;
+}
+.unknownTimeToggle input { width: 18px; height: 18px; accent-color: #ad72c6; flex: 0 0 auto; }
+.birthDateTimeGrid .unknownTimeToggle { grid-column: 1 / -1; }
+.birthplaceField { margin-bottom: 10px; }
+.birthPrefsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.manualGrid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.birthHint { margin: 8px 0 0; }
+.geoAttribution { display: block; margin-top: 6px; font-size: 10px; color: rgba(43,27,59,.5); }
+
+.placeSearchWrap { position: relative; }
+.placeSearchWrap > input { width: 100%; }
+.placeSuggestions {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(200,182,255,.56);
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 14px 32px rgba(60,34,78,.18);
+}
+.placeSuggestion {
+  width: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  border-bottom: 1px solid rgba(200,182,255,.2);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 10px 12px;
+}
+.placeSuggestion:last-child { border-bottom: 0; }
+.placeSuggestionName { font-weight: 800; }
+.placeSuggestionMeta { font-size: 11px; opacity: .65; font-weight: 500; }
+
+.readingPrefs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.readingPrefs label { display: flex; flex-direction: column; gap: 5px; min-width: 180px; font-size: 12px; }
+.warningBox, .compositeIntro {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255,238,201,.7);
+  border: 1px solid rgba(214,174,89,.35);
+  font-size: 12.5px;
+}
+.compositeIntro { background: rgba(235,226,255,.56); border-color: rgba(178,149,230,.38); }
+.downloadButton { white-space: nowrap; }
+
+.chartPanel { min-width: 0; }
+.chartPanel > h3 { text-align: center; }
+.chartCenter { display: flex; justify-content: center; width: 100%; overflow: auto; }
+.chartBoxSmall { min-height: 0; width: min(100%, 760px); }
+.distCenter { margin-top: 10px; }
+.twoCharts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 14px;
+  align-items: start;
+}
+.twoCharts .chartBoxSmall { padding: 10px; }
+.twoCharts .aspectCard { max-height: 420px; overflow: auto; }
+
+.synastryTableWrap { overflow: auto; border-radius: 14px; border: 1px solid rgba(200,182,255,.34); }
+.synastryTable { width: 100%; border-collapse: collapse; min-width: 540px; background: rgba(255,255,255,.55); }
+.synastryTable th, .synastryTable td { padding: 8px 10px; text-align: left; border-bottom: 1px solid rgba(200,182,255,.22); font-size: 12px; }
+.synastryTable th { background: rgba(232,220,250,.55); font-weight: 850; }
+.methodNote { margin-top: 8px; }
+
+.astroMapCard { width: 100%; }
+.astroMapToolbar { display: flex; justify-content: space-between; gap: 12px; align-items: end; flex-wrap: wrap; margin-bottom: 10px; }
+.astroMapToolbar > label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; min-width: 180px; }
+.angleToggles { display: flex; gap: 7px; flex-wrap: wrap; }
+.angleToggles label { display: inline-flex; flex-direction: row; align-items: center; gap: 5px; font-size: 12px; padding: 7px 10px; border-radius: 999px; background: rgba(255,255,255,.66); border: 1px solid rgba(200,182,255,.35); }
+.angleToggles input { width: 16px; height: 16px; accent-color: #8e62a7; }
+.astroMapViewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(200,182,255,.45);
+}
+.worldMapImage, .astroMapOverlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+.worldMapImage { object-fit: fill; opacity: .92; }
+.astroMapOverlay { pointer-events: none; }
+.astroMapLegend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 8px; font-size: 11px; color: rgba(43,27,59,.72); }
+.astroMapNote { margin: 6px 0 0; }
+
+@media (max-width: 900px) {
+  .appShell { padding: 14px; }
+  .hero { flex-direction: column; }
+  .devApiField { min-width: 0; width: 100%; }
+  .toolTabs { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .dualBirthForms, .twoCharts { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .appShell { padding: 9px; }
+  .hero h1 { font-size: 30px; }
+  .hero p { font-size: 12px; }
+  .toolTabs { gap: 6px; padding: 6px; border-radius: 15px; }
+  .toolTabs button { min-height: 46px; padding: 9px 8px; font-size: 12.5px; }
+  .birthForm { padding: 10px; }
+  .birthForm input, .birthForm select, .readingPrefs select, .astroMapToolbar select {
+    width: 100%;
+    min-height: 50px;
+    padding: 12px 13px;
+    border-radius: 14px;
+    font-size: 16px;
+  }
+  .birthForm select, .readingPrefs select, .astroMapToolbar select {
+    appearance: auto;
+    -webkit-appearance: menulist;
+    background-image: none;
+    padding-right: 12px;
+  }
+  .birthForm label, .birthForm .field { font-size: 13px; font-weight: 650; }
+  .birthDateTimeGrid { grid-template-columns: 1fr 1fr; }
+  .birthDateTimeGrid .unknownTimeToggle { grid-column: 1 / -1; }
+  .birthPrefsGrid, .manualGrid { grid-template-columns: 1fr; }
+  .readingPrefs { display: grid; grid-template-columns: 1fr; }
+  .readingPrefs label { min-width: 0; }
+  .actions button, .downloadButton { width: 100%; min-height: 50px; font-size: 15px; }
+  .resultHeader { flex-direction: column; align-items: stretch; }
+  .chartBoxSmall { padding: 7px; border-radius: 18px; }
+  .astroMapViewport { aspect-ratio: 1.55 / 1; }
+  .astroMapOverlay, .worldMapImage { object-fit: fill; }
+  .astroMapToolbar > label { width: 100%; }
+  .angleToggles { width: 100%; display: grid; grid-template-columns: repeat(4, 1fr); }
+  .angleToggles label { justify-content: center; padding: 8px 4px; }
+  .output { max-height: none; font-size: 13px; }
+  .synastryTable th, .synastryTable td { font-size: 11.5px; padding: 7px 8px; }
+}
+
+@media (max-width: 380px) {
+  .birthDateTimeGrid { grid-template-columns: 1fr; }
+  .birthDateTimeGrid .unknownTimeToggle { grid-column: auto; }
+}
+
+.overlayGrids {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 10px;
+}
+.overlayCard {
+  border: 1px solid rgba(200,182,255,.34);
+  background: rgba(255,255,255,.5);
+  border-radius: 14px;
+  padding: 11px;
+  font-size: 12px;
+}
+.overlayList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.overlayList span {
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(239,229,248,.6);
+}
+@media (max-width: 640px) {
+  .overlayGrids { grid-template-columns: 1fr; }
+  .overlayList { grid-template-columns: 1fr 1fr; }
+}
+
+/* v1.4.0 — precise positions + premium readings */
+.precisePositions { margin-top: 1.25rem; }
+.subsectionHeading h3 { margin-bottom: .25rem; }
+.positionTableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid rgba(129, 87, 167, .18); border-radius: 16px; background: rgba(255,255,255,.55); }
+.positionTable { width: 100%; border-collapse: collapse; min-width: 560px; }
+.positionTable th, .positionTable td { padding: .72rem .85rem; text-align: left; border-bottom: 1px solid rgba(129, 87, 167, .12); }
+.positionTable th { font-size: .82rem; letter-spacing: .02em; color: #62576b; background: rgba(255,255,255,.4); }
+.positionTable tr:last-child td { border-bottom: 0; }
+.calculationMeta { margin: .65rem .2rem 0; font-size: .9rem; }
+
+.premiumSection { margin-top: 1.4rem; position: relative; overflow: hidden; }
+.premiumSection::before { content: ""; position: absolute; width: 280px; height: 280px; border-radius: 50%; background: rgba(236, 185, 255, .22); filter: blur(10px); right: -120px; top: -120px; pointer-events: none; }
+.premiumIntro { max-width: 760px; position: relative; z-index: 1; }
+.premiumKicker, .premiumEyebrow { text-transform: uppercase; letter-spacing: .11em; font-weight: 800; font-size: .76rem; color: #8e5aa8; }
+.premiumGrid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; margin-top: 1.15rem; position: relative; z-index: 1; }
+.premiumCard { padding: 1.2rem; border-radius: 22px; border: 1px solid rgba(150, 105, 177, .24); background: rgba(255,255,255,.62); box-shadow: 0 12px 34px rgba(102, 63, 121, .08); }
+.premiumCard.featured { border-color: rgba(216, 110, 180, .5); background: linear-gradient(155deg, rgba(255,255,255,.78), rgba(252,232,248,.72)); }
+.premiumCard h3 { margin: .35rem 0 .55rem; }
+.premiumCard p { line-height: 1.55; }
+.premiumPrice { font-weight: 900; font-size: 1.6rem; margin: .85rem 0 .5rem; }
+.premiumCard ul { margin: .8rem 0 1.1rem; padding-left: 1.15rem; }
+.premiumCard li { margin: .42rem 0; }
+.premiumCta { display: inline-flex; width: 100%; min-height: 46px; align-items: center; justify-content: center; border-radius: 14px; text-decoration: none; font-weight: 800; border: 0; background: linear-gradient(90deg, #ef7caf, #b58cff); color: #261b2c; cursor: pointer; }
+.premiumCta.disabled { opacity: .52; cursor: not-allowed; }
+.premiumFinePrint { margin: 1rem .1rem 0; font-size: .86rem; position: relative; z-index: 1; }
+
+@media (max-width: 760px) {
+  .premiumGrid { grid-template-columns: 1fr; }
+  .premiumCard { padding: 1rem; }
+  .positionTable { min-width: 520px; }
+}
+
+/* v1.5.0 — premium report promise */
+.premiumReportPromise {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem;
+  margin-top: 1.05rem;
+}
+.premiumReportPromise > div {
+  padding: .9rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(150, 105, 177, .18);
+  background: rgba(255,255,255,.5);
+  display: grid;
+  gap: .35rem;
+}
+.premiumReportPromise strong { color: #5d416d; }
+.premiumReportPromise span { color: #74697b; font-size: .9rem; line-height: 1.48; }
+@media (max-width: 760px) {
+  .premiumReportPromise { grid-template-columns: 1fr; }
+}
+
+/* ===== v1.6 explicit date input ===== */
+.dateFieldGroup { min-width: 0; }
+.dateFormatHint {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(85,56,105,.56);
+  letter-spacing: .03em;
+  margin-left: 4px;
+}
+.dateParts {
+  display: grid;
+  grid-template-columns: .72fr 1.55fr .95fr;
+  gap: 7px;
+}
+.datePart { min-width: 0; gap: 4px !important; }
+.datePart > span {
+  font-size: 10px;
+  font-weight: 750;
+  color: rgba(69,43,86,.58);
+  text-transform: uppercase;
+  letter-spacing: .055em;
+}
+.datePart input, .datePart select { width: 100%; }
+
+/* ===== v1.6 synastry bi-wheel ===== */
+.synastryWheelShell {
+  max-width: 860px;
+  margin: 4px auto 22px;
+  padding: 14px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(255,255,255,.74), rgba(249,239,248,.64));
+  border: 1px solid rgba(187,158,211,.42);
+  box-shadow: 0 18px 44px rgba(83,53,103,.10);
+}
+.synastryWheelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.synastryWheelHeader > div { display: flex; flex-direction: column; gap: 2px; }
+.synastryWheelHeader strong { font-size: 16px; }
+.synastryWheelHeader span { font-size: 11.5px; color: rgba(59,37,74,.62); }
+.synastrySwap { padding: 8px 12px; font-size: 11.5px; }
+.synastryLegend { display: flex; flex-wrap: wrap; gap: 7px 14px; align-items: center; margin-bottom: 6px; font-size: 11px; }
+.synastryLegend span { display: inline-flex; gap: 6px; align-items: center; }
+.synastryLegend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.legendInner i { background: #d8c6ef; border: 1px solid #8766ad; }
+.legendOuter i { background: #f7cfe1; border: 1px solid #cf6b9b; }
+.synastryBiWheel { display: block; width: 100%; height: auto; max-height: 760px; }
+.synastryWheelNote { margin: 6px 3px 0; line-height: 1.45; }
+
+/* ===== v1.6 readable, safe interpretation renderer ===== */
+.readingOutput {
+  background: rgba(255,255,255,.67);
+  border: 1px solid rgba(180,140,255,.34);
+  border-radius: 20px;
+  padding: clamp(16px, 2.5vw, 28px);
+  color: rgba(43,27,59,.94);
+  line-height: 1.72;
+  box-shadow: inset 0 0 22px rgba(255,255,255,.55), 0 10px 25px rgba(140,100,220,.10);
+}
+.readingHeading {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.2;
+  color: #55346a;
+  margin: 24px 0 9px;
+}
+.readingHeading:first-child { margin-top: 0; }
+.readingHeading2 { font-size: clamp(21px, 2.4vw, 28px); }
+.readingParagraph { margin: 0 0 12px; font-size: 14px; }
+.readingList { margin: 4px 0 16px 20px; padding: 0; }
+.readingList li { margin: 0 0 8px; font-size: 14px; }
+.readingOutput strong { color: #6b3d78; }
+
+@media (max-width: 640px) {
+  .dateParts { grid-template-columns: .72fr 1.45fr .95fr; gap: 6px; }
+  .datePart input, .datePart select { min-height: 48px !important; padding: 10px 8px !important; font-size: 15px !important; }
+  .datePartMonth select { font-size: 14px !important; }
+  .synastryWheelShell { padding: 9px; border-radius: 17px; }
+  .synastryWheelHeader { align-items: stretch; flex-direction: column; }
+  .synastrySwap { width: 100%; min-height: 44px; }
+  .readingParagraph, .readingList li { font-size: 13.5px; }
+}
+
+@media (max-width: 390px) {
+  .dateParts { grid-template-columns: 1fr; }
+  .datePart > span { font-size: 10.5px; }
+}
+
+.astroLineGuide {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid rgba(183,153,211,.34);
+  border-radius: 16px;
+  background: rgba(255,255,255,.58);
+}
+.astroLineGuide > strong { font-family: Georgia, 'Times New Roman', serif; color: #5a376e; font-size: 17px; }
+.astroLineGuide > p { margin: 6px 0 10px; font-size: 12.5px; line-height: 1.5; }
+.astroAngleGuideGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.astroAngleGuideGrid > div { padding: 9px 10px; border-radius: 12px; background: rgba(244,238,248,.58); opacity: .58; transition: .15s ease; }
+.astroAngleGuideGrid > div.active { opacity: 1; background: rgba(245,230,243,.78); box-shadow: inset 0 0 0 1px rgba(179,126,175,.18); }
+.astroAngleGuideGrid b { display: block; font-size: 11.5px; margin-bottom: 3px; }
+.astroAngleGuideGrid span { display: block; font-size: 11.5px; line-height: 1.4; }
+.astroWatch { margin-bottom: 0 !important; color: rgba(66,42,80,.72); }
+@media(max-width:640px){ .astroAngleGuideGrid{grid-template-columns:1fr;} }

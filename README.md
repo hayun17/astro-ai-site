@@ -1,125 +1,90 @@
-# AstroAI Site (RAG-based Astrology Interpreter)
+# AstroMYLA v1.6.0 — Production Release Candidate
 
-A **working** web app that:
+AstroMYLA is a responsive astrology web application for natal charts, synastry, composite charts, astrocartography, downloadable reports, and protected premium natal reports.
 
-1) Calculates a natal chart (planets, houses, major aspects) with **Swiss Ephemeris**.
-2) Generates **original** interpretations using an LLM, optionally grounded on a **local text corpus** (RAG / retrieval-augmented generation).
+## What is new in v1.6.0
 
-Built as:
-- **Backend:** FastAPI (Python)
-- **Frontend:** Vite + React (TypeScript)
+- Unambiguous birth-date entry: **Day / Month / Year** is visible in the UI and each part is separately labelled.
+- Production forms now start clean instead of exposing development/example birth data.
+- Synastry now uses a true **bi-wheel**: one chart inside, one outside, same zodiac, inter-chart aspect lines through the center, and the inner person's houses. A swap button reverses the house-overlay perspective.
+- Synastry, composite, and astrocartography interpretation prompts and corpus-only fallbacks are substantially expanded.
+- Composite charts include symbolic midpoint house cusps only when both exact birth times are known; otherwise houses are omitted.
+- Interpretation Markdown is rendered as safe React content instead of raw `<pre>` text.
+- Astrocartography includes per-planet ASC/DSC/MC/IC guidance in the interface.
+- Production attack surface and information disclosure are reduced.
+- Security response headers, strict CORS, trusted-host checks, request-size checks, endpoint rate limiting, production-only route hiding, and server-side premium secrets are included.
+- Core web dependencies are pinned to current 2026 FastAPI / Starlette / Uvicorn / Pydantic releases in `backend/requirements.txt`.
 
----
+## Feature set
 
-## Legal / ethical note (Tumblr & Reddit)
-You asked to "collect all Tumblr astrology interpretations" and "collect Reddit comments". Automatically scraping/copying large amounts of platform content can violate Terms of Service and can raise copyright issues.
+- Natal chart calculation with Swiss Ephemeris / PySwissEph
+- Historical IANA timezone resolution
+- Unknown-birth-time safeguards
+- Placidus, Whole Sign, Koch, Regiomontanus, Campanus, Equal houses
+- Aspects, houses, points, retrograde state and precise position tables
+- Complete structured interpretation corpus
+- Synastry bi-wheel, inter-aspects and two-way house overlays
+- Zodiacal-midpoint composite chart
+- Astrocartography ASC / DSC / MC / IC lines for Sun through Pluto
+- City autocomplete and automatic timezone lookup
+- Free PDF reports
+- Protected Personalized and Deep Personal premium natal PDFs
 
-So this project is designed to be **safe by default**:
-- It **does not scrape** Tumblr or Reddit.
-- It lets you **add your own corpus** (texts you wrote, texts you have permission to use, public-domain texts, or content you export/download under the platform rules).
-- The interpretation uses RAG: it will cite which corpus snippets influenced the answer (in the JSON response), so you can audit grounding.
+## Local development — Windows PowerShell
 
-If you want Reddit data, a safer workflow is: use Reddit's API or your own data export (or your own posts/comments), then place the text files into `backend/data/corpus/`.
+### Backend
 
----
-
-## Quickstart
-
-### 1) Backend (FastAPI)
-
-```bash
+```powershell
 cd backend
 python -m venv .venv
-# Windows:
-# .venv\Scripts\activate
-# Linux/macOS:
-# source .venv/bin/activate
-
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-
-# build a local retrieval index from ./data/corpus/*.txt
-python -m app.build_index
-
-# run
+Copy-Item .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-Backend runs at `http://localhost:8000`.
+### Frontend
 
-### 2) Frontend (Vite + React)
+Open a second terminal:
 
-```bash
+```powershell
 cd frontend
-npm install
+npm ci
+Set-Content .env.local "VITE_API_BASE_URL=http://127.0.0.1:8000"
 npm run dev
 ```
 
-Frontend runs at `http://localhost:5173`.
+Open the Vite URL shown in the terminal, normally `http://localhost:5173`.
 
----
+## Validation status
 
-## Configure LLM (optional but recommended)
-The app supports any **OpenAI-compatible** API endpoint.
+- Backend regression suite: **32/32 PASS** in the release workspace.
+- Python compile checks: PASS.
+- Frontend TypeScript/TSX source syntax transpilation: **12/12 PASS**.
+- Full `npm ci && npm run build` could not be completed in the packaging sandbox because external npm downloads were unavailable; run it locally and on Render before promotion from RC to production.
+- See `CALCULATION_VALIDATION.md` for published-ephemeris and historical-timezone validation.
 
-1) Copy `.env.example` to `.env` inside `backend/`.
-2) Set:
-- `LLM_PROVIDER=openai_compatible`
-- `OPENAI_API_KEY=...`
-- `OPENAI_BASE_URL=...` (optional; defaults to OpenAI)
-- `OPENAI_MODEL=...` (default: `gpt-4o-mini`)
+## Production and security
 
-If you do **not** set an API key, the app still runs and returns a deterministic "baseline" interpretation so the UI stays functional.
+Read these before deploying:
 
----
+- `DEPLOYMENT.md`
+- `PRODUCTION_READINESS.md`
+- `SECURITY.md`
+- `RELATIONSHIP_METHODS.md`
+- `PREMIUM_SETUP.md`
 
-## Add your own "Tumblr/Reddit-style" corpus
-Put plain text files here:
+## Current production topology
 
-```
-backend/data/corpus/
-  tumblr_style_notes.txt
-  reddit_threads_export.txt
-  your_blog_posts.txt
-```
+- Public site: `https://astromyla.com`
+- Render frontend: `astro-ai-site-frontend`
+- Backend API: `https://astromyla.onrender.com`
+- The custom domain belongs on the frontend service, not the backend service.
 
-Then rebuild index:
+## Commercial licensing note
 
-```bash
-cd backend
-python -m app.build_index
-```
+The numerical chart engine uses Swiss Ephemeris through `pyswisseph`. Review and satisfy Swiss Ephemeris AGPL / Professional License requirements before operating AstroMYLA as a proprietary paid service.
 
----
+## Disclaimer
 
-## API summary
-- `POST /api/chart/natal` -> chart JSON (planets/houses/aspects)
-- `POST /api/interpret/natal` -> interpretation JSON
-
----
-
-## Repo structure
-
-```
-astro-ai-site/
-  backend/
-    app/
-      main.py
-      astrology.py
-      rag.py
-      llm.py
-      build_index.py
-      schemas.py
-    data/
-      corpus/
-      index.json
-    requirements.txt
-    .env.example
-  frontend/
-    src/
-      main.tsx
-      App.tsx
-      api.ts
-      types.ts
-    index.html
-    package.json
-```
+Astrological interpretations are symbolic/interpretive. They are not scientifically validated predictions and are not medical, legal, financial, or mental-health advice.

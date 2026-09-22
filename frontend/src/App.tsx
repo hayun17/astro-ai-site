@@ -1,20 +1,16 @@
 import React, { useMemo, useState } from "react";
-import ChartWheel from "./components/chart/ChartWheel.tsx";
-import AspectTriangle from "./components/chart/AspectTriangle.tsx";
-import Distributions from "./components/chart/Distributions.tsx";
+import ChartWheel from "./components/chart/ChartWheel";
+import AspectTriangle from "./components/chart/AspectTriangle";
+import Distributions from "./components/chart/Distributions";
+import BirthDataForm, { BirthDraft, makeBirthDraft } from "./components/BirthDataForm";
+import AstrocartographyMap from "./components/AstrocartographyMap";
+import PrecisePositions from "./components/PrecisePositions";
+import PremiumReadings from "./components/PremiumReadings";
+import InterpretationView from "./components/InterpretationView";
+import SynastryBiWheel from "./components/chart/SynastryBiWheel";
+import { fetchWithTimeout, geocodePlace, readApiError } from "./lib/api";
 
-type Birth = {
-  name: string;
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  latitude: number;
-  longitude: number;
-  tz_offset_hours: number;
-  house_system?: string;
-};
+type Mode = "natal" | "synastry" | "composite" | "astrocartography";
 
 const RAW_ENV_API =
   (import.meta.env.VITE_API_BASE_URL as string) ||
@@ -27,501 +23,351 @@ function normalizeBase(url: string) {
 const DEFAULT_API_BASE = normalizeBase(RAW_ENV_API);
 const IS_DEV = import.meta.env.DEV;
 
-type GeoHit = { lat: number; lon: number; displayName: string };
+async function prepareBirth(draft: BirthDraft, style: string, focus: string) {
+  const year = Number(draft.year);
+  const month = Number(draft.month);
+  const day = Number(draft.day);
+  if (!draft.year || !draft.month || !draft.day || !Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    throw new Error("Please enter your full date of birth in Day / Month / Year order.");
+  }
+  const d = new Date(Date.UTC(year, month - 1, day));
+  const validDate = d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+  if (!validDate) throw new Error("Please enter a valid date of birth in Day / Month / Year order.");
 
-async function geocodePlace(q: string): Promise<GeoHit | null> {
-  const query = (q || "").trim();
-  if (!query) return null;
+  const hour = draft.timeUnknown ? 12 : Number(draft.hour);
+  const minute = draft.timeUnknown ? 0 : Number(draft.minute);
+  if (!draft.timeUnknown && (draft.hour === "" || draft.minute === "" || !Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59)) {
+    throw new Error("Please enter your birth time, or choose ‘I don’t know my birth time’. ");
+  }
 
-  // OpenStreetMap Nominatim (simple, free).
-  // If this ever rate-limits, we can move geocoding to backend later.
-  const url =
-    "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
-    encodeURIComponent(query);
-
-  const resp = await fetch(url, {
-    headers: {
-      "Accept-Language": "en",
-    },
-  });
-
-  if (!resp.ok) return null;
-  const data = await resp.json();
-  if (!Array.isArray(data) || data.length === 0) return null;
-
-  const hit = data[0];
-  const lat = parseFloat(hit?.lat);
-  const lon = parseFloat(hit?.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-
+  let geo = draft.geo;
+  if (!draft.useAdvancedCoords && !geo) {
+    geo = await geocodePlace(draft.birthplace);
+  }
+  const lat = draft.useAdvancedCoords ? draft.latitude : geo?.lat;
+  const lon = draft.useAdvancedCoords ? draft.longitude : geo?.lon;
+  if (lat === "" || lon === "" || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))) {
+    throw new Error("Could not resolve birthplace. Choose a city suggestion or use Advanced manual coordinates.");
+  }
+  const timezone = draft.useAdvancedCoords ? null : geo?.timezone || null;
+  const offset = Number(draft.tz_offset_hours);
+  if (!timezone && (draft.tz_offset_hours === "" || !Number.isFinite(offset) || offset < -14 || offset > 14)) {
+    throw new Error("Choose a birthplace suggestion with a timezone, or enter the UTC offset in Advanced/manual mode.");
+  }
   return {
-    lat,
-    lon,
-    displayName: String(hit?.display_name || query),
+    name: draft.name,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    latitude: Number(lat),
+    longitude: Number(lon),
+    tz_offset_hours: timezone ? 0 : offset,
+    house_system: draft.house_system || "P",
+    style,
+    focus,
+    time_unknown: draft.timeUnknown,
+    timezone,
+    birthplace: draft.birthplace || null,
   };
 }
 
+function allChartAspects(chart: any) {
+  const aspects = chart?.aspects || {};
+  return [
+    ...(Array.isArray(aspects.planet_aspects) ? aspects.planet_aspects : []),
+    ...(Array.isArray(aspects.other_aspects) ? aspects.other_aspects : []),
+  ];
+}
+
+function chartBodies(chart: any) {
+  const preferred = [
+    "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto",
+    "Asc", "DSC", "MC", "IC", "TrueNode", "Lilith", "Chiron", "Vertex", "Fortune",
+  ];
+  const present = new Set<string>([
+    ...Object.keys(chart?.planets || {}),
+    ...Object.keys(chart?.points || {}),
+  ]);
+  return preferred.filter((name) => present.has(name));
+}
+
+function planetSummary(chart: any) {
+  const planets = chart?.planets || {};
+  return ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"]
+    .filter((k) => planets[k]?.sign)
+    .map((k) => {
+      const p = planets[k];
+      if (p.sign_uncertain) return `${k}: ${(p.possible_signs || []).join("/")}?`;
+      const deg = Number.isFinite(Number(p.deg_in_sign)) ? Math.floor(Number(p.deg_in_sign)) : 0;
+      return `${k}: ${p.sign}${chart?.time_unknown ? "" : ` ${deg}°`}`;
+    })
+    .join(" • ");
+}
+
+function ChartPanel({ chart, title }: { chart: any; title?: string }) {
+  if (!chart) return null;
+  const aspects = allChartAspects(chart);
+  const bodies = chartBodies(chart);
+  return (
+    <div className="chartPanel">
+      {title && <h3>{title}</h3>}
+      {chart.time_unknown && (
+        <div className="timeUnknownNotice">
+          <strong>Birth time unknown mode</strong>
+          <span>Houses, angles and time-sensitive Moon aspects are intentionally not guessed.</span>
+        </div>
+      )}
+      <div className="pill">{planetSummary(chart)}</div>
+      <div className="chartCenter">
+        <div className="chartBox chartBoxSmall"><ChartWheel chart={chart} /></div>
+      </div>
+      {aspects.length > 0 && bodies.length > 1 && (
+        <div className="chartCenter"><AspectTriangle aspects={aspects} bodies={bodies} /></div>
+      )}
+      <div className="chartCenter distCenter"><Distributions planets={chart.planets} /></div>
+      <PrecisePositions chart={chart} />
+    </div>
+  );
+}
+
+function SynastryAspectTable({ aspects, aName, bName }: { aspects: any[]; aName: string; bName: string }) {
+  if (!aspects?.length) return <p className="muted">No major cross-chart aspects within the configured orbs.</p>;
+  return (
+    <div className="synastryTableWrap">
+      <table className="synastryTable">
+        <thead><tr><th>{aName || "Person A"}</th><th>Aspect</th><th>{bName || "Person B"}</th><th>Orb</th></tr></thead>
+        <tbody>
+          {aspects.slice(0, 36).map((a, idx) => (
+            <tr key={`${a.a}-${a.aspect}-${a.b}-${idx}`}>
+              <td>{a.a}</td><td>{a.aspect}</td><td>{a.b}</td><td>{Number(a.orb).toFixed(2)}°</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function App() {
+  const [mode, setMode] = useState<Mode>("natal");
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
-
-  const [birth, setBirth] = useState<Birth>({
-    name: "Example",
-    year: 2002,
-    month: 1,
-    day: 25,
-    hour: 9,
-    minute: 30,
-    latitude: 40.653,
-    longitude: 35.833,
-    tz_offset_hours: 3.0,
-    house_system: "P",
-  });
-
-  // UX: user-friendly inputs
-  const [birthplace, setBirthplace] = useState("Merzifon, Amasya, Türkiye");
-  const [geoResolved, setGeoResolved] = useState<GeoHit | null>(null);
-  const [geoLoading, setGeoLoading] = useState(false);
-
-  const [useAdvancedCoords, setUseAdvancedCoords] = useState(false);
-
-  // Dropdowns
-  const [houseSystem, setHouseSystem] = useState<string>(birth.house_system || "P");
+  const [personA, setPersonA] = useState<BirthDraft>(makeBirthDraft());
+  const [personB, setPersonB] = useState<BirthDraft>(makeBirthDraft());
   const [style, setStyle] = useState("modern");
   const [focus, setFocus] = useState("general");
-
   const [loading, setLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [result, setResult] = useState<any>(null);
 
-  const planetsSummary = useMemo(() => {
-    const planets = result?.chart?.planets;
-    if (!planets) return null;
+  const base = IS_DEV ? normalizeBase(apiBase) : DEFAULT_API_BASE;
 
-    const keys = [
-      "Sun",
-      "Moon",
-      "Mercury",
-      "Venus",
-      "Mars",
-      "Jupiter",
-      "Saturn",
-      "Uranus",
-      "Neptune",
-      "Pluto",
-    ];
+  const title = useMemo(() => ({
+    natal: "Birth Chart",
+    synastry: "Synastry",
+    composite: "Composite Chart",
+    astrocartography: "Astrocartography",
+  }[mode]), [mode]);
 
-    return keys
-      .filter((k) => planets[k])
-      .map((k) => {
-        const p = planets[k];
-        const deg = Number.isFinite(p?.deg_in_sign) ? Math.floor(p.deg_in_sign) : 0;
-        return `${k}: ${p.sign} ${deg}°`;
-      })
-      .join(" • ");
-  }, [result]);
-
-  const chartForWheel = useMemo(() => result?.chart ?? null, [result]);
-
-  const aspectRows = useMemo(() => {
-    const aspects = result?.chart?.aspects;
-    if (!aspects) return [];
-    const a1 = Array.isArray(aspects?.planet_aspects) ? aspects.planet_aspects : [];
-    const a2 = Array.isArray(aspects?.other_aspects) ? aspects.other_aspects : [];
-    return [...a1, ...a2];
-  }, [result]);
-
-  const aspectBodies = useMemo(() => {
-    // prefer list, but only include bodies actually present in chart data
-    const preferred = [
-      "Sun",
-      "Moon",
-      "Mercury",
-      "Venus",
-      "Mars",
-      "Jupiter",
-      "Saturn",
-      "Uranus",
-      "Neptune",
-      "Pluto",
-      "Asc",
-      "DSC",
-      "MC",
-      "IC",
-      "TrueNode",
-      "Lilith",
-      "Chiron",
-      "Vertex",
-      "Fortune",
-    ];
-
-    const planets = result?.chart?.planets || {};
-    const points = result?.chart?.points || {};
-
-    const present = new Set<string>();
-    Object.keys(planets).forEach((k) => present.add(k));
-    Object.keys(points).forEach((k) => present.add(k));
-
-    // normalize some possible backend naming variants
-    const aliases: Record<string, string[]> = {
-      Asc: ["ASC", "Ascendant"],
-      DSC: ["Desc", "Descendant", "DC"],
-      MC: ["Midheaven"],
-      IC: ["ImumCoeli"],
-      TrueNode: ["NorthNode", "Node", "NNode"],
-      Lilith: ["BlackMoonLilith", "BML"],
-      Fortune: ["PartOfFortune", "POF"],
-    };
-
-    const exists = (name: string) => {
-      if (present.has(name)) return true;
-      const al = aliases[name] || [];
-      return al.some((a) => present.has(a));
-    };
-
-    const out = preferred.filter(exists);
-
-    // if there are other “interesting” points in points, optionally add them at the end
-    // (keeps it future-proof)
-    for (const k of Object.keys(points)) {
-      if (!out.includes(k) && out.length < 22) out.push(k);
-    }
-
-    return out;
-  }, [result]);
-
-  async function resolveGeocodeIfNeeded(): Promise<{ lat: number; lon: number } | null> {
-    if (useAdvancedCoords) {
-      if (Number.isFinite(birth.latitude) && Number.isFinite(birth.longitude)) {
-        return { lat: birth.latitude, lon: birth.longitude };
-      }
-      return null;
-    }
-
-    // If already resolved and user didn't change birthplace, reuse
-    if (geoResolved && geoResolved.displayName && birthplace.trim().length > 0) {
-      return { lat: geoResolved.lat, lon: geoResolved.lon };
-    }
-
-    setGeoLoading(true);
-    try {
-      const hit = await geocodePlace(birthplace);
-      if (!hit) return null;
-      setGeoResolved(hit);
-      return { lat: hit.lat, lon: hit.lon };
-    } finally {
-      setGeoLoading(false);
-    }
+  function changeMode(next: Mode) {
+    setMode(next);
+    setResult(null);
+    setError(null);
   }
 
-  async function runInterpretation() {
+  async function postJson(path: string, payload: any) {
+    const resp = await fetchWithTimeout(`${base}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }, 90000);
+    if (!resp.ok) throw new Error(await readApiError(resp));
+    return resp.json();
+  }
+
+  async function runTool() {
     setLoading(true);
     setError(null);
     setResult(null);
-
     try {
-      const coords = await resolveGeocodeIfNeeded();
-      if (!coords) {
-        throw new Error(
-          "Could not resolve birthplace to coordinates. Try a more specific place (City, Country) or open Advanced and enter latitude/longitude manually."
-        );
-      }
-
-      const payload = {
-        ...birth,
-        latitude: coords.lat,
-        longitude: coords.lon,
-        house_system: houseSystem || "P",
-        // style/focus are UX fields for now; we can send them to backend later if you want
-      };
-
-      const base = IS_DEV ? normalizeBase(apiBase) : DEFAULT_API_BASE;
-
-      const resp = await fetch(`${base}/api/interpret/natal`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!resp.ok) {
-        const txt = await resp.text();
-        throw new Error(txt || `Request failed (${resp.status})`);
-      }
-
-      const data = await resp.json();
-      setResult(data);
-
-      // Optional: see raw chart JSON in DEV console only
-      if (IS_DEV) {
-        // eslint-disable-next-line no-console
-        console.log("CHART JSON:", data?.chart);
+      const a = await prepareBirth(personA, style, focus);
+      if (mode === "natal") {
+        setResult(await postJson("/api/interpret/natal", a));
+      } else if (mode === "astrocartography") {
+        if (a.time_unknown) throw new Error("Astrocartography needs a known birth time. Uncheck ‘I don’t know my birth time’ to calculate angular lines.");
+        setResult(await postJson("/api/interpret/astrocartography", a));
+      } else {
+        const b = await prepareBirth(personB, style, "relationships");
+        const payload = { person_a: a, person_b: b, style };
+        setResult(await postJson(mode === "synastry" ? "/api/interpret/synastry" : "/api/interpret/composite", payload));
       }
     } catch (e: any) {
-      setError(e?.message || "Unknown error");
+      setError(e?.name === "AbortError" ? "The request timed out. Please try again." : e?.message || "Unknown error");
     } finally {
       setLoading(false);
     }
   }
 
-  async function rebuildIndex() {
-    setLoading(true);
+  function reportPayload() {
+    const reportTitle = mode === "natal"
+      ? `AstroMYLA Natal Report - ${personA.name || "Chart"}`
+      : mode === "astrocartography"
+      ? `AstroMYLA Astrocartography - ${personA.name || "Chart"}`
+      : `AstroMYLA ${mode === "synastry" ? "Synastry" : "Composite"} - ${personA.name || "A"} x ${personB.name || "B"}`;
+    return {
+      kind: mode,
+      title: reportTitle,
+      data: result,
+      interpretation: result?.interpretation || "",
+    };
+  }
+
+  async function downloadPdf() {
+    if (!result) return;
+    setPdfLoading(true);
     setError(null);
-
     try {
-      const base = IS_DEV ? normalizeBase(apiBase) : DEFAULT_API_BASE;
-
-      const resp = await fetch(`${base}/api/rebuild-index`, { method: "POST" });
-      if (!resp.ok) {
-        const txt = await resp.text();
-        throw new Error(txt || `Request failed (${resp.status})`);
-      }
-      const data = await resp.json();
-      alert(`Index rebuilt. Chunks: ${data.chunks}`);
+      const resp = await fetchWithTimeout(`${base}/api/report/pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reportPayload()),
+      }, 90000);
+      if (!resp.ok) throw new Error(await readApiError(resp));
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const disposition = resp.headers.get("content-disposition") || "";
+      const match = disposition.match(/filename="?([^";]+)"?/i);
+      a.download = match?.[1] || `astromyla-${mode}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e: any) {
-      setError(e?.message || "Unknown error");
+      setError(e?.message || "Could not download PDF.");
     } finally {
-      setLoading(false);
+      setPdfLoading(false);
     }
   }
 
   return (
-    <div className="page">
-      <header className="header">
+    <div className="appShell">
+      <header className="hero">
         <div>
           <h1>AstroMYLA</h1>
-          <p className="sub">AI Birth Chart + Source-Backed Interpretation</p>
+          <p>Birth charts, relationship astrology, composite charts and astrocartography — with downloadable reports.</p>
         </div>
-
         {IS_DEV && (
-          <div className="api">
-            <label>
-              API Base (dev only)
-              <input
-                value={apiBase}
-                onChange={(e) => setApiBase(e.target.value)}
-                placeholder="http://localhost:8000"
-              />
-            </label>
-          </div>
+          <label className="devApiField">API Base (dev only)<input value={apiBase} onChange={(e) => setApiBase(e.target.value)} /></label>
         )}
       </header>
 
-      {/* FORM */}
-      <section className="card">
-        <h2>Enter your birth data ✨</h2>
+      <nav className="toolTabs" aria-label="Astrology tools">
+        {([
+          ["natal", "Birth Chart"],
+          ["synastry", "Synastry"],
+          ["composite", "Composite"],
+          ["astrocartography", "Astrocartography"],
+        ] as [Mode, string][]).map(([key, label]) => (
+          <button key={key} className={mode === key ? "active" : ""} onClick={() => changeMode(key)}>{label}</button>
+        ))}
+      </nav>
 
-        <div className="form">
-          <label>
-            Name
-            <input
-              value={birth.name}
-              onChange={(e) => setBirth({ ...birth, name: e.target.value })}
-            />
-          </label>
-
-          <div className="row">
-            <label>
-              Date (YYYY-MM-DD)
-              <input
-                value={`${birth.year}-${String(birth.month).padStart(2, "0")}-${String(
-                  birth.day
-                ).padStart(2, "0")}`}
-                onChange={(e) => {
-                  const [y, m, d] = e.target.value.split("-").map((n) => parseInt(n, 10));
-                  if (y && m && d) setBirth({ ...birth, year: y, month: m, day: d });
-                }}
-              />
-            </label>
-
-            <label>
-              Time (HH:MM)
-              <input
-                value={`${String(birth.hour).padStart(2, "0")}:${String(birth.minute).padStart(
-                  2,
-                  "0"
-                )}`}
-                onChange={(e) => {
-                  const [hh, mm] = e.target.value.split(":").map((n) => parseInt(n, 10));
-                  if (Number.isFinite(hh) && Number.isFinite(mm))
-                    setBirth({ ...birth, hour: hh, minute: mm });
-                }}
-              />
-            </label>
-
-            <label>
-              UTC Offset
-              <input
-                type="number"
-                step="0.5"
-                value={birth.tz_offset_hours}
-                onChange={(e) =>
-                  setBirth({ ...birth, tz_offset_hours: parseFloat(e.target.value) })
-                }
-              />
-            </label>
-          </div>
-
-          <label>
-            Birthplace (City, Country)
-            <input
-              value={birthplace}
-              onChange={(e) => {
-                setBirthplace(e.target.value);
-                setGeoResolved(null);
-              }}
-              placeholder="e.g., Ankara, Türkiye"
-            />
-            <span className="help">
-              {geoLoading
-                ? "Looking up coordinates…"
-                : geoResolved
-                ? `Resolved: ${geoResolved.displayName}  (lat ${geoResolved.lat.toFixed(
-                    3
-                  )}, lon ${geoResolved.lon.toFixed(3)})`
-                : "Tip: If lookup fails, try a more specific query like “City, Country”."}
-            </span>
-          </label>
-
-          <div className="row">
-            <label>
-              House system
-              <select
-                value={houseSystem}
-                onChange={(e) => {
-                  setHouseSystem(e.target.value);
-                  setBirth({ ...birth, house_system: e.target.value });
-                }}
-              >
-                <option value="P">Placidus (P)</option>
-                <option value="W">Whole Sign (W)</option>
-                <option value="K">Koch (K)</option>
-                <option value="R">Regiomontanus (R)</option>
-                <option value="C">Campanus (C)</option>
-                <option value="E">Equal (E)</option>
-              </select>
-            </label>
-
-            <label>
-              Style
-              <select value={style} onChange={(e) => setStyle(e.target.value)}>
-                <option value="modern">Modern</option>
-                <option value="traditional">Traditional</option>
-                <option value="psychological">Psychological</option>
-              </select>
-            </label>
-
-            <label>
-              Focus
-              <select value={focus} onChange={(e) => setFocus(e.target.value)}>
-                <option value="general">General</option>
-                <option value="relationships">Relationships</option>
-                <option value="career">Career</option>
-                <option value="year_ahead">Year Ahead</option>
-              </select>
-            </label>
-          </div>
-
-          <details className="advanced">
-            <summary>
-              Advanced (manual coordinates){" "}
-              <span className="muted">(use only if birthplace lookup fails)</span>
-            </summary>
-            <div className="row">
-              <label>
-                Use manual latitude/longitude
-                <select
-                  value={useAdvancedCoords ? "yes" : "no"}
-                  onChange={(e) => setUseAdvancedCoords(e.target.value === "yes")}
-                >
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
-                </select>
-              </label>
-
-              <label>
-                Latitude
-                <input
-                  type="number"
-                  step="0.0001"
-                  value={birth.latitude}
-                  onChange={(e) =>
-                    setBirth({ ...birth, latitude: parseFloat(e.target.value) })
-                  }
-                  disabled={!useAdvancedCoords}
-                />
-              </label>
-
-              <label>
-                Longitude
-                <input
-                  type="number"
-                  step="0.0001"
-                  value={birth.longitude}
-                  onChange={(e) =>
-                    setBirth({ ...birth, longitude: parseFloat(e.target.value) })
-                  }
-                  disabled={!useAdvancedCoords}
-                />
-              </label>
-            </div>
-          </details>
-
-          <div className="actions">
-            <button onClick={runInterpretation} disabled={loading}>
-              Generate interpretation
-            </button>
-
-            {IS_DEV && (
-              <button onClick={rebuildIndex} disabled={loading} className="secondary">
-                Rebuild corpus index (dev only)
-              </button>
-            )}
-          </div>
-
-          {error && <p className="error">{error}</p>}
-          {loading && <p className="muted">Working…</p>}
+      <section className="card inputCard">
+        <div className="sectionHeading">
+          <div><h2>{title} ✨</h2><p className="muted">
+            {mode === "natal" && "Enter one person’s birth data."}
+            {mode === "synastry" && "Compare two natal charts through cross-chart aspects — no simplistic compatibility score."}
+            {mode === "composite" && "Build a zodiacal midpoint composite to explore the relationship as a symbolic whole."}
+            {mode === "astrocartography" && "Map where natal planets were on the ASC, DSC, MC and IC at the birth moment."}
+          </p></div>
         </div>
+
+        <div className={mode === "synastry" || mode === "composite" ? "dualBirthForms" : "singleBirthForm"}>
+          <BirthDataForm value={personA} onChange={setPersonA} title={mode === "synastry" || mode === "composite" ? "Person A" : undefined} compact={mode !== "natal"} />
+          {(mode === "synastry" || mode === "composite") && <BirthDataForm value={personB} onChange={setPersonB} title="Person B" compact />}
+        </div>
+
+        <div className="readingPrefs">
+          <label>Style<select value={style} onChange={(e) => setStyle(e.target.value)}><option value="modern">Modern</option><option value="traditional">Traditional</option><option value="psychological">Psychological</option></select></label>
+          {mode === "natal" && <label>Focus<select value={focus} onChange={(e) => setFocus(e.target.value)}><option value="general">General</option><option value="relationships">Relationships</option><option value="career">Career</option><option value="year_ahead">Year Ahead</option></select></label>}
+        </div>
+
+        {mode === "astrocartography" && personA.timeUnknown && <div className="warningBox">Astrocartography cannot be calculated reliably without an exact birth time because the angular lines rotate with sidereal time.</div>}
+
+        <div className="actions">
+          <button onClick={runTool} disabled={loading}>{loading ? "Calculating…" : `Generate ${title}`}</button>
+        </div>
+        {error && <p className="error">{error}</p>}
       </section>
 
-      {/* RESULTS (CENTERED STACK) */}
-      <section className="card results">
-        <h2>Your Chart ✨</h2>
-
-        {!result && <p className="muted">Generate an interpretation to render your chart.</p>}
-
-        {result && (
-          <>
-            <div className="pill">{planetsSummary}</div>
-
-            <div className="chartCenter">
-              <div className="chartBox chartBoxSmall">
-                {chartForWheel ? <ChartWheel chart={chartForWheel} /> : <p>No chart data.</p>}
-              </div>
+      {result && (
+        <>
+          <section className="card results">
+            <div className="resultHeader">
+              <h2>{title} Results ✨</h2>
+              <button className="secondary downloadButton" onClick={downloadPdf} disabled={pdfLoading}>{pdfLoading ? "Preparing PDF…" : "Download PDF report"}</button>
             </div>
 
-            {/* Aspect table centered, then distributions under it */}
-            <div className="chartCenter">
-              <AspectTriangle aspects={aspectRows} bodies={aspectBodies} />
-            </div>
+            {mode === "natal" && <ChartPanel chart={result.chart} />}
 
-            <div className="chartCenter distCenter">
-              <Distributions planets={result?.chart?.planets} />
-            </div>
-          </>
-        )}
-      </section>
+            {mode === "synastry" && (
+              <>
+                <SynastryBiWheel
+                  chartA={result.synastry?.person_a}
+                  chartB={result.synastry?.person_b}
+                  aspects={result.synastry?.aspects || []}
+                  aName={personA.name}
+                  bName={personB.name}
+                />
+                <h3>Cross-chart aspects</h3>
+                <SynastryAspectTable aspects={result.synastry?.aspects || []} aName={personA.name} bName={personB.name} />
+                {(result.synastry?.house_overlays?.a_in_b_houses?.length > 0 || result.synastry?.house_overlays?.b_in_a_houses?.length > 0) && (
+                  <>
+                    <h3>House overlays</h3>
+                    <div className="overlayGrids">
+                      <div className="overlayCard">
+                        <strong>{personA.name || "Person A"} planets in {personB.name || "Person B"}'s houses</strong>
+                        <div className="overlayList">
+                          {(result.synastry?.house_overlays?.a_in_b_houses || []).map((x: any) => <span key={`ab-${x.planet}`}>{x.planet} → House {x.house}</span>)}
+                        </div>
+                      </div>
+                      <div className="overlayCard">
+                        <strong>{personB.name || "Person B"} planets in {personA.name || "Person A"}'s houses</strong>
+                        <div className="overlayList">
+                          {(result.synastry?.house_overlays?.b_in_a_houses || []).map((x: any) => <span key={`ba-${x.planet}`}>{x.planet} → House {x.house}</span>)}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+                <p className="muted methodNote">This bi-wheel compares inter-chart aspects and house overlays without reducing the relationship to a compatibility score.</p>
+              </>
+            )}
 
-      <section className="card">
-        <h2>Your Interpretation ✨</h2>
-        {!result && <p className="muted">Run an interpretation to see the output.</p>}
-        {result && <pre className="output">{result.interpretation}</pre>}
+            {mode === "composite" && (
+              <>
+                <div className="compositeIntro"><strong>About this chart:</strong> Composite planets use zodiacal midpoints. When both birth times are known, midpoint house cusps are included as a symbolic relationship layer.</div>
+                <ChartPanel chart={result.composite} title={`${personA.name || "A"} × ${personB.name || "B"}`} />
+              </>
+            )}
 
-        {/* IMPORTANT: We intentionally do NOT show RAG sources or raw Chart JSON to users. */}
-      </section>
+            {mode === "astrocartography" && <AstrocartographyMap data={result.astrocartography} />}
+          </section>
 
-      <footer className="footer">
-        <p>© {new Date().getFullYear()} AstroMYLA</p>
-      </footer>
+          <section className="card interpretationCard">
+            <div className="resultHeader"><h2>Interpretation ✨</h2></div>
+            <InterpretationView text={result.interpretation} />
+          </section>
+        </>
+      )}
+
+      <PremiumReadings />
+
+      <footer className="footer"><p>© {new Date().getFullYear()} AstroMYLA</p><p className="muted">Astrology is interpretive and is not scientific or professional advice.</p></footer>
     </div>
   );
 }

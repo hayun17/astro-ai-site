@@ -1,21 +1,24 @@
 # Python
 backend/.venv/
 backend/__pycache__/
-*.pyc
+backend/**/__pycache__/
+*.py[cod]
+.pytest_cache/
 
 # Node
 frontend/node_modules/
 frontend/dist/
 
-# Env
+# Secrets / local environment
 .env
 backend/.env
 backend/.env.local
+frontend/.env
+frontend/.env.local
+frontend/.env.production
 
-# OS
+# Editor / OS
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
-
-frontend/.env.production
-frontend/.env.local
-frontend/.env

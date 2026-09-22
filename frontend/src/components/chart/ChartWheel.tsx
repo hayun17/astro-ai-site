@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import "./chartStyles.css";
-import ChartBackground from "./ChartBackground.png";
+import ChartBackground from "./ChartBackground.webp";
 
 type Props = {
   chart: any;
