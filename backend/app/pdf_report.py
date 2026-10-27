@@ -428,6 +428,28 @@ def _synastry_summary(data: dict[str, Any], styles) -> list[Any]:
     return [Paragraph("Tight cross-chart aspects", styles["Section"]), table, Spacer(1, 4 * mm)]
 
 
+def _transit_summary(data: dict[str, Any], styles) -> list[Any]:
+    tr = data.get("transits") if isinstance(data.get("transits"), dict) else {}
+    out: list[Any] = []
+    target = _safe_ascii(tr.get("target_utc") or "")
+    if target:
+        out.append(Paragraph("Current transit snapshot", styles["Section"]))
+        out.append(Paragraph(escape(target.replace("T", " ")[:19] + " UTC"), styles["Small"]))
+    rows = tr.get("top_aspects") or tr.get("aspects") or []
+    if rows:
+        out.append(Paragraph("Strongest active transits", styles["Section"]))
+        for row in rows[:10]:
+            line = f"Transit {row.get('transit')} {row.get('aspect')} natal {row.get('natal')} - orb {float(row.get('orb') or 0):.2f} deg - {'applying' if row.get('applying') else 'separating'}"
+            out.append(Paragraph(escape(_safe_ascii(line)), styles["Body"]))
+    houses = tr.get("house_overlays") or []
+    if houses:
+        out.append(Paragraph("Transit planets in natal houses", styles["Section"]))
+        for row in houses[:10]:
+            line = f"{row.get('planet')} in House {row.get('house')}: {row.get('theme') or ''}"
+            out.append(Paragraph(escape(_safe_ascii(line)), styles["Body"]))
+    return out
+
+
 def _astrocartography_summary(data: dict[str, Any], styles) -> list[Any]:
     acg = data.get("astrocartography") if isinstance(data.get("astrocartography"), dict) else data
     bodies = (acg or {}).get("bodies") or {}
@@ -575,6 +597,8 @@ def build_report_pdf(*, kind: str, title: str, data: dict[str, Any], interpretat
     elif kind == "composite":
         composite = data.get("composite") if isinstance(data.get("composite"), dict) else data
         story.extend(_natal_summary({"chart": composite or {}}, styles))
+    elif kind == "transits":
+        story.extend(_transit_summary(data, styles))
 
     if interpretation:
         story.append(Paragraph("Interpretation", styles["Section"]))

@@ -364,3 +364,106 @@ class ExtendedSuiteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class V18FeatureTests(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(app)
+        self.birth = {
+            **SAMPLE,
+            "timezone": "Europe/Istanbul",
+            "house_system": "P",
+            "style": "modern",
+            "focus": "general",
+            "time_unknown": False,
+        }
+
+    def test_transit_endpoint_returns_planets_aspects_and_natal_house_overlays(self):
+        r = self.client.post("/api/chart/transits", json={"birth": self.birth, "target_date": "2026-10-27", "style": "modern"})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertIn("Sun", body["transits"]["planets"])
+        self.assertIsInstance(body["transits"]["aspects"], list)
+        self.assertGreater(len(body["transits"]["house_overlays"]), 0)
+        self.assertEqual(body["transits"]["target_utc"][:10], "2026-10-27")
+
+    def test_unknown_birth_time_transits_omit_natal_house_overlays(self):
+        r = self.client.post("/api/chart/transits", json={"birth": {**self.birth, "time_unknown": True}, "target_date": "2026-10-27", "style": "modern"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["transits"]["house_overlays"], [])
+
+    def test_synastry_returns_directional_house_activation_summaries(self):
+        other = {**self.birth, "name":"Other", "year":2000, "month":7, "day":14, "hour":18, "minute":0, "latitude":39.9334, "longitude":32.8597}
+        r = self.client.post("/api/chart/synastry", json={"person_a":self.birth,"person_b":other,"style":"modern","orb_profile":"standard"})
+        self.assertEqual(r.status_code, 200)
+        overlays = r.json()["house_overlays"]
+        self.assertGreater(len(overlays["a_in_b_houses"]), 0)
+        self.assertGreater(len(overlays["b_in_a_houses"]), 0)
+        self.assertIn("theme", overlays["a_in_b_houses"][0])
+        self.assertGreater(len(overlays["a_activates_b"]), 0)
+
+    def test_account_register_save_load_and_delete_chart(self):
+        import os, uuid
+        os.environ["DATABASE_URL"] = "sqlite:////tmp/astromyla-v18-test.sqlite3"
+        email = f"test-{uuid.uuid4().hex[:10]}@example.com"
+        r = self.client.post("/api/account/register", json={"email":email,"password":"correct-horse-123","display_name":"Tester"})
+        self.assertEqual(r.status_code, 200)
+        token = r.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        s = self.client.post("/api/account/charts", headers=headers, json={"label":"Me","birth":self.birth})
+        self.assertEqual(s.status_code, 200)
+        chart_id = s.json()["chart"]["id"]
+        me = self.client.get("/api/account/me", headers=headers)
+        self.assertEqual(me.status_code, 200)
+        self.assertTrue(any(x["id"] == chart_id for x in me.json()["charts"]))
+        d = self.client.delete(f"/api/account/charts/{chart_id}", headers=headers)
+        self.assertEqual(d.status_code, 200)
+
+class AstroMylaSignatureTests(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(app)
+        self.a = {
+            **SAMPLE,
+            "timezone": "Europe/Istanbul",
+            "house_system": "P",
+            "style": "modern",
+            "focus": "general",
+            "time_unknown": False,
+        }
+        self.b = {
+            **self.a,
+            "name": "Other",
+            "year": 2000, "month": 7, "day": 14,
+            "hour": 18, "minute": 0,
+            "latitude": 39.9334, "longitude": 32.8597,
+        }
+
+    def test_natal_interpretation_returns_signature_suite(self):
+        r = self.client.post("/api/interpret/natal", json=self.a)
+        self.assertEqual(r.status_code, 200)
+        suite = r.json()["astromyla"]
+        self.assertTrue(suite["signature"]["headline"].startswith("The "))
+        self.assertGreaterEqual(len(suite["signature"]["core_energy"]), 2)
+        self.assertIn("partner_blueprint", suite)
+        self.assertIn("attract_vs_need", suite)
+        self.assertIn("emotional_manual", suite)
+
+    def test_partner_blueprint_uses_seventh_house_when_time_known(self):
+        r = self.client.post("/api/interpret/natal", json=self.a)
+        bp = r.json()["astromyla"]["partner_blueprint"]
+        self.assertIsNone(bp["time_note"])
+        self.assertTrue(any("7th-house" in item for item in bp["evidence"]))
+
+    def test_partner_blueprint_does_not_invent_seventh_house_when_time_unknown(self):
+        r = self.client.post("/api/interpret/natal", json={**self.a, "time_unknown": True})
+        self.assertEqual(r.status_code, 200)
+        bp = r.json()["astromyla"]["partner_blueprint"]
+        self.assertIn("unknown", bp["time_note"].lower())
+        self.assertFalse(any("7th-house" in item for item in bp["evidence"]))
+
+    def test_synastry_returns_myla_match_from_aspects_and_house_overlays(self):
+        r = self.client.post("/api/interpret/synastry", json={"person_a": self.a, "person_b": self.b, "style": "modern"})
+        self.assertEqual(r.status_code, 200)
+        match = r.json()["synastry"]["myla_match"]
+        self.assertGreaterEqual(len(match["themes"]), 1)
+        self.assertTrue(match["headline"])
+        self.assertIn("house", match["method_note"].lower())

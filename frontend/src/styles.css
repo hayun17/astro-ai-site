@@ -1332,3 +1332,47 @@ button.placeSuggestion:focus-visible {
   .dateParts { grid-template-columns:.72fr 1.35fr .92fr !important; }
   .datePart input, .datePart select { padding-left:6px !important; padding-right:6px !important; }
 }
+
+/* v1.8 Current Sky + My AstroMYLA */
+.heroActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}.accountButton{white-space:nowrap;background:rgba(255,255,255,.78);border:1px solid rgba(161,115,195,.35);color:#51315f;padding:10px 14px;border-radius:999px;font-weight:800;box-shadow:0 7px 24px rgba(97,52,117,.08)}
+.accountModal{position:relative;width:min(680px,calc(100vw - 28px));max-height:min(760px,calc(100vh - 28px));overflow:auto;background:rgba(255,251,253,.98);border:1px solid rgba(185,126,187,.28);border-radius:24px;padding:28px;box-shadow:0 24px 70px rgba(70,38,82,.22)}
+.accountForm{display:grid;gap:14px}.accountForm label{display:grid;gap:6px;font-weight:700}.accountForm input,.saveChartRow input{width:100%;box-sizing:border-box}.linkButton,.dangerLink{background:transparent;border:0;box-shadow:none;color:#79508c;text-decoration:underline;padding:8px 4px}.dangerLink{color:#9d4c68}.saveChartRow{display:grid;grid-template-columns:1fr auto;gap:10px;margin:18px 0}.savedChartsList{display:grid;gap:10px;margin:14px 0 22px}.savedChartItem{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:13px 14px;border:1px solid rgba(161,115,195,.2);border-radius:16px;background:rgba(255,255,255,.68)}.savedChartItem>div:first-child{display:grid;gap:3px}.savedChartItem span{font-size:.82rem;color:#806d88}.savedChartItem>div:last-child{display:flex;gap:7px;align-items:center}
+.transitDateControl{display:flex;gap:8px;align-items:center}.transitDateControl input{min-width:170px}.transitMoment{font-size:.82rem;color:#806d88;background:rgba(255,255,255,.65);border:1px solid rgba(168,140,190,.22);padding:7px 10px;border-radius:999px}.transitSummaryGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}.transitSummaryGrid .overlayList span,.overlayList span{line-height:1.45}.houseActivationSummary{margin:12px 0 14px;padding:14px;border-radius:16px;background:rgba(250,244,255,.72);border:1px solid rgba(161,115,195,.17)}.activationChips{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.activationChips span{font-size:.8rem;padding:7px 10px;border-radius:999px;background:white;border:1px solid rgba(161,115,195,.22);color:#634574}.transitWheelShell{margin-top:8px}
+@media(max-width:760px){.hero{align-items:flex-start}.heroActions{width:100%;justify-content:flex-start}.accountButton{font-size:.88rem}.saveChartRow{grid-template-columns:1fr}.savedChartItem{align-items:flex-start;flex-direction:column}.savedChartItem>div:last-child{width:100%;justify-content:flex-start}.transitSummaryGrid{grid-template-columns:1fr}.transitDateControl{align-items:stretch;flex-direction:column}.transitDateControl input{min-width:0}.accountModal{padding:22px 16px}.transitMoment{display:none}}
+.saveChartButtons{display:flex;gap:8px;flex-wrap:wrap}.saveChartButtons button{white-space:nowrap}
+@media(max-width:760px){.saveChartButtons{width:100%}.saveChartButtons button{flex:1}}
+
+/* =========================================================
+   v1.9 — AstroMYLA Signature insights
+   ========================================================= */
+.signatureSuite { display:grid; gap:14px; margin:10px 0 18px; }
+.signatureHero { position:relative; overflow:hidden; }
+.signatureHero::after { content:"✦"; position:absolute; right:22px; top:16px; font-size:46px; color:rgba(183,139,207,.18); pointer-events:none; }
+.signatureMiniGrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:12px 0; }
+.signatureMiniGrid > div, .blueprintRows > div, .manualGridCards > div, .attractNeedGrid > div {
+  padding:12px; border-radius:14px; background:rgba(255,255,255,.58); border:1px solid rgba(170,132,194,.16);
+}
+.signatureMiniGrid strong, .blueprintRows strong, .manualGridCards strong, .attractNeedGrid strong { display:block; margin-bottom:7px; color:#684878; font-size:12px; }
+.signatureMiniGrid ul, .manualGridCards ul { margin:0; padding-left:18px; display:grid; gap:6px; font-size:12px; line-height:1.45; }
+.signatureMeta { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 2px; }
+.signatureMeta span { padding:6px 9px; border-radius:999px; background:rgba(255,232,243,.62); border:1px solid rgba(214,147,181,.18); color:#7b516c; font-size:10.5px; font-weight:800; }
+.signatureTwoCol { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.blueprintRows { display:grid; gap:9px; }
+.blueprintRows > div > span { display:block; font-size:12px; line-height:1.5; color:#5f5266; }
+.attractNeedGrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.emotionalManual { margin-top:0; }
+.manualGridCards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.manualGridCards p { margin:0; font-size:12px; line-height:1.5; color:#5f5266; }
+.signatureMethod { margin-top:10px !important; font-size:10.5px; }
+.mylaMatchCard { border-color:rgba(255,154,194,.30); background:linear-gradient(145deg,rgba(255,244,249,.9),rgba(244,242,255,.82)); }
+.mylaThemeGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.mylaThemeGrid article { padding:12px; border-radius:14px; background:rgba(255,255,255,.66); border:1px solid rgba(165,124,191,.16); }
+.mylaThemeGrid article strong { color:#684878; font-size:12.5px; }
+.mylaThemeGrid article p { margin:6px 0 8px; font-size:11.5px; line-height:1.5; color:#5f5266; }
+.mylaThemeGrid article span { display:block; font-size:9.5px; color:rgba(80,57,92,.56); line-height:1.35; }
+
+@media (max-width:760px) {
+  .signatureMiniGrid, .signatureTwoCol, .manualGridCards, .attractNeedGrid, .mylaThemeGrid { grid-template-columns:1fr; }
+  .signatureHero::after { font-size:34px; right:14px; top:12px; }
+  .signatureMiniGrid > div, .blueprintRows > div, .manualGridCards > div, .attractNeedGrid > div, .mylaThemeGrid article { padding:10px; }
+}

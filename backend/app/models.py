@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 HouseSystem = Literal["P", "W", "K", "R", "C", "E"]
 InterpretationStyle = Literal["modern", "traditional", "psychological"]
 InterpretationFocus = Literal["general", "relationships", "career", "year_ahead"]
-ReportKind = Literal["natal", "synastry", "composite", "astrocartography"]
+ReportKind = Literal["natal", "synastry", "composite", "astrocartography", "transits"]
 ReportTier = Literal["free", "personalized", "deep"]
 
 
@@ -45,6 +45,32 @@ class RelationshipRequest(BaseModel):
     person_b: BirthData
     style: InterpretationStyle = "modern"
     orb_profile: Literal["tight", "standard", "wide"] = "standard"
+
+
+class TransitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    birth: BirthData
+    target_date: date | None = None
+    style: InterpretationStyle = "modern"
+
+
+class AccountRegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    email: str = Field(min_length=5, max_length=200)
+    password: str = Field(min_length=8, max_length=200)
+    display_name: str = Field(default="", max_length=80)
+
+
+class AccountLoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    email: str = Field(min_length=5, max_length=200)
+    password: str = Field(min_length=8, max_length=200)
+
+
+class SavedChartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    label: str = Field(default="Saved chart", max_length=80)
+    birth: BirthData
 
 
 class ReportRequest(BaseModel):

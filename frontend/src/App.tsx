@@ -8,11 +8,14 @@ import PrecisePositions from "./components/PrecisePositions";
 import PremiumReadings from "./components/PremiumReadings";
 import InterpretationView from "./components/InterpretationView";
 import SynastryBiWheel from "./components/chart/SynastryBiWheel";
+import TransitBiWheel from "./components/chart/TransitBiWheel";
+import AccountPanel from "./components/AccountPanel";
 import CalculationProgress from "./components/CalculationProgress";
 import { ConnectionProfile, CompositeSignature } from "./components/ResultInsights";
+import { NatalSignatureSuite, MylaMatch } from "./components/SignatureInsights";
 import { fetchWithTimeout, geocodePlace, readApiError } from "./lib/api";
 
-type Mode = "natal" | "synastry" | "composite" | "astrocartography";
+type Mode = "natal" | "transits" | "synastry" | "composite" | "astrocartography";
 
 const RAW_ENV_API =
   (import.meta.env.VITE_API_BASE_URL as string) ||
@@ -72,6 +75,18 @@ async function prepareBirth(draft: BirthDraft, style: string, focus: string) {
     time_unknown: draft.timeUnknown,
     timezone,
     birthplace: draft.birthplace || null,
+  };
+}
+
+function draftFromBirth(birth: any): BirthDraft {
+  return {
+    name: birth?.name || "", year: Number(birth?.year) || "", month: Number(birth?.month) || "", day: Number(birth?.day) || "",
+    hour: birth?.time_unknown ? "" : (Number.isFinite(Number(birth?.hour)) ? Number(birth.hour) : ""),
+    minute: birth?.time_unknown ? "" : (Number.isFinite(Number(birth?.minute)) ? Number(birth.minute) : ""),
+    latitude: Number.isFinite(Number(birth?.latitude)) ? Number(birth.latitude) : "", longitude: Number.isFinite(Number(birth?.longitude)) ? Number(birth.longitude) : "",
+    tz_offset_hours: Number.isFinite(Number(birth?.tz_offset_hours)) ? Number(birth.tz_offset_hours) : "", house_system: birth?.house_system || "P",
+    birthplace: birth?.birthplace || "", geo: birth?.timezone ? {lat:Number(birth.latitude),lon:Number(birth.longitude),displayName:birth?.birthplace||"Saved place",timezone:birth.timezone}:null,
+    useAdvancedCoords: !birth?.timezone, timeUnknown: Boolean(birth?.time_unknown),
   };
 }
 
@@ -160,6 +175,7 @@ export default function App() {
   const [style, setStyle] = useState("modern");
   const [focus, setFocus] = useState("general");
   const [orbProfile, setOrbProfile] = useState("standard");
+  const [transitDate, setTransitDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,6 +202,7 @@ export default function App() {
 
   const title = useMemo(() => ({
     natal: "Birth Chart",
+    transits: "Current Transits",
     synastry: "Synastry",
     composite: "Composite Chart",
     astrocartography: "Astrocartography",
@@ -222,6 +239,9 @@ export default function App() {
       if (mode === "natal") {
         setProgress({percent:48,label:"Calculating houses & aspects"});
         payloadResult = await postJson("/api/interpret/natal", a);
+      } else if (mode === "transits") {
+        setProgress({percent:46,label:"Calculating the current sky"});
+        payloadResult = await postJson("/api/interpret/daily", { birth: a, target_date: transitDate || null, style });
       } else if (mode === "astrocartography") {
         if (a.time_unknown) throw new Error("Astrocartography needs a known birth time. Uncheck ‘I don’t know my birth time’ to calculate angular lines.");
         setProgress({percent:52,label:"Tracing angular lines around the world"});
@@ -252,6 +272,8 @@ export default function App() {
       ? `AstroMYLA Natal Report - ${personA.name || "Chart"}`
       : mode === "astrocartography"
       ? `AstroMYLA Astrocartography - ${personA.name || "Chart"}`
+      : mode === "transits"
+      ? `AstroMYLA Current Transits - ${personA.name || "Chart"}`
       : `AstroMYLA ${mode === "synastry" ? "Synastry" : "Composite"} - ${personA.name || "A"} x ${personB.name || "B"}`;
     return {
       kind: mode,
@@ -331,16 +353,20 @@ export default function App() {
       <header className="hero">
         <div>
           <h1>AstroMYLA</h1>
-          <p>Birth charts, relationship astrology, composite charts and astrocartography — with downloadable reports.</p>
+          <p>Personal astrology, current transits, relationship maps and AstroMYLA signature insights — with downloadable reports.</p>
         </div>
-        {IS_DEV && (
-          <label className="devApiField">API Base (dev only)<input value={apiBase} onChange={(e) => setApiBase(e.target.value)} /></label>
-        )}
+        <div className="heroActions">
+          <AccountPanel apiBase={base} prepareBirthA={() => prepareBirth(personA, style, focus)} prepareBirthB={() => prepareBirth(personB, style, "relationships")} showPersonB={mode === "synastry" || mode === "composite"} onLoadBirth={(birth,slot)=>{if(slot === "B") setPersonB(draftFromBirth(birth)); else setPersonA(draftFromBirth(birth)); setResult(null);}} />
+          {IS_DEV && (
+            <label className="devApiField">API Base (dev only)<input value={apiBase} onChange={(e) => setApiBase(e.target.value)} /></label>
+          )}
+        </div>
       </header>
 
       <nav className="toolTabs" aria-label="Astrology tools">
         {([
           ["natal", "Birth Chart"],
+          ["transits", "Transits"],
           ["synastry", "Synastry"],
           ["composite", "Composite"],
           ["astrocartography", "Astrocartography"],
@@ -353,6 +379,7 @@ export default function App() {
         <div className="sectionHeading">
           <div><h2>{title} ✨</h2><p className="muted">
             {mode === "natal" && "Enter one person’s birth data."}
+            {mode === "transits" && "Layer the current sky over your natal chart and read the strongest active themes."}
             {mode === "synastry" && "Compare two natal charts through a bi-wheel, cross-chart aspects and a transparent connection profile."}
             {mode === "composite" && "Build a zodiacal midpoint composite to explore the relationship as a symbolic whole."}
             {mode === "astrocartography" && "Map where natal planets were on the ASC, DSC, MC and IC at the birth moment."}
@@ -367,6 +394,7 @@ export default function App() {
         <div className="readingPrefs">
           <label>Style<select value={style} onChange={(e) => setStyle(e.target.value)}><option value="modern">Modern</option><option value="traditional">Traditional</option><option value="psychological">Psychological</option></select></label>
           {mode === "natal" && <label>Focus<select value={focus} onChange={(e) => setFocus(e.target.value)}><option value="general">General</option><option value="relationships">Relationships</option><option value="career">Career</option><option value="year_ahead">Year Ahead</option></select></label>}
+          {mode === "transits" && <label>Transit date <span className="dateFormatHint">leave blank for now</span><div className="transitDateControl"><input type="date" value={transitDate} onChange={(e)=>setTransitDate(e.target.value)}/>{transitDate && <button type="button" className="secondary" onClick={()=>setTransitDate("")}>Use now</button>}</div></label>}
           {(mode === "synastry" || mode === "composite") && <label>Aspect orbs<select value={orbProfile} onChange={(e)=>setOrbProfile(e.target.value)}><option value="tight">Tight</option><option value="standard">Standard</option><option value="wide">Wide</option></select></label>}
         </div>
 
@@ -387,7 +415,21 @@ export default function App() {
               <button className="secondary downloadButton" onClick={downloadPdf} disabled={pdfLoading}>{pdfLoading ? "Preparing PDF…" : "Download PDF report"}</button>
             </div>
 
-            {mode === "natal" && <ChartPanel chart={result.chart} />}
+            {mode === "natal" && <>
+              <NatalSignatureSuite data={result.astromyla} />
+              <ChartPanel chart={result.chart} />
+            </>}
+
+            {mode === "transits" && (
+              <>
+                <TransitBiWheel natal={result.natal} transits={result.transits} />
+                <div className="transitSummaryGrid">
+                  <div className="overlayCard"><strong>Strongest active transits</strong><div className="overlayList">{(result.transits?.top_aspects||[]).slice(0,8).map((x:any,i:number)=><span key={i}><b>{x.transit} {x.aspect} natal {x.natal}</b> · {Number(x.orb).toFixed(2)}° · {x.applying?"applying":"separating"}</span>)}</div></div>
+                  <div className="overlayCard"><strong>Planets moving through your natal houses</strong><div className="overlayList">{(result.transits?.house_overlays||[]).slice(0,10).map((x:any)=><span key={x.planet}><b>{x.planet} → House {x.house}</b> · {x.theme}</span>)}{!(result.transits?.house_overlays||[]).length&&<span className="muted">House transits require a known birth time.</span>}</div></div>
+                </div>
+                <p className="muted methodNote">Current transits describe symbolic timing and emphasis, not fixed predictions.</p>
+              </>
+            )}
 
             {mode === "synastry" && (
               <>
@@ -399,22 +441,27 @@ export default function App() {
                   bName={personB.name}
                 />
                 <ConnectionProfile profile={result.synastry?.connection_profile} />
+                <MylaMatch match={result.synastry?.myla_match} />
                 <h3>Cross-chart aspects</h3>
                 <SynastryAspectTable aspects={result.synastry?.aspects || []} aName={personA.name} bName={personB.name} />
                 {(result.synastry?.house_overlays?.a_in_b_houses?.length > 0 || result.synastry?.house_overlays?.b_in_a_houses?.length > 0) && (
                   <>
                     <h3>House overlays</h3>
+                    <div className="houseActivationSummary">
+                      <strong>Most activated houses</strong>
+                      <div className="activationChips">{(result.synastry?.house_overlays?.a_activates_b||[]).slice(0,4).map((x:any)=><span key={`a-${x.house}`}>{personA.name||"A"} → {personB.name||"B"} H{x.house} · {x.count}</span>)}{(result.synastry?.house_overlays?.b_activates_a||[]).slice(0,4).map((x:any)=><span key={`b-${x.house}`}>{personB.name||"B"} → {personA.name||"A"} H{x.house} · {x.count}</span>)}</div>
+                    </div>
                     <div className="overlayGrids">
                       <div className="overlayCard">
                         <strong>{personA.name || "Person A"} planets in {personB.name || "Person B"}'s houses</strong>
                         <div className="overlayList">
-                          {(result.synastry?.house_overlays?.a_in_b_houses || []).map((x: any) => <span key={`ab-${x.planet}`}>{x.planet} → House {x.house}</span>)}
+                          {(result.synastry?.house_overlays?.a_in_b_houses || []).map((x: any) => <span key={`ab-${x.planet}`}><b>{x.planet} → House {x.house}</b> · {x.theme}</span>)}
                         </div>
                       </div>
                       <div className="overlayCard">
                         <strong>{personB.name || "Person B"} planets in {personA.name || "Person A"}'s houses</strong>
                         <div className="overlayList">
-                          {(result.synastry?.house_overlays?.b_in_a_houses || []).map((x: any) => <span key={`ba-${x.planet}`}>{x.planet} → House {x.house}</span>)}
+                          {(result.synastry?.house_overlays?.b_in_a_houses || []).map((x: any) => <span key={`ba-${x.planet}`}><b>{x.planet} → House {x.house}</b> · {x.theme}</span>)}
                         </div>
                       </div>
                     </div>

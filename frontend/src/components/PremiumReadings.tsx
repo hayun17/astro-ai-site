@@ -39,7 +39,7 @@ function ReadingCard({ eyebrow, title, description, features, price, featured, o
       {price && <div className="premiumPrice">{price}</div>}
       <ul>{features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
       <button className="premiumCta" type="button" onClick={onChoose} disabled={!enabled}>
-        {enabled ? "Choose this reading" : "Secure checkout setup pending"}
+        {enabled ? "Choose this reading" : "Checkout coming soon"}
       </button>
     </article>
   );
@@ -82,7 +82,7 @@ export default function PremiumReadings({ onCheckout, checkoutBusy = false, chec
       <div className="premiumReportPromise" aria-label="Premium report format">
         <div><strong>Your natal chart comes first.</strong><span>The opening page includes the full birth-chart wheel so every interpretation has a visible map behind it.</span></div>
         <div><strong>Written like a real reading.</strong><span>Long-form synthesis, gentle transitions and specific chart patterns — not copied placement blurbs stitched together.</span></div>
-        <div><strong>Secure hosted checkout.</strong><span>Card details stay on iyzico's checkout. AstroMYLA receives only the verified payment result before unlocking the report.</span></div>
+        <div><strong>Secure checkout.</strong><span>Your payment is completed on a secure hosted payment page. AstroMYLA receives only the verified payment result before unlocking your report.</span></div>
       </div>
 
       <div className="premiumGrid">
@@ -96,7 +96,7 @@ export default function PremiumReadings({ onCheckout, checkoutBusy = false, chec
           features={["Everything in the Personalized Reading","A longer, more layered whole-chart synthesis","Up to 3 personal questions or themes addressed directly","Deeper relationship, boundaries and inner-pattern analysis","Contradictory chart signatures explored instead of flattened","Premium keepsake PDF with the natal chart at the front"]}/>
       </div>
 
-      {!enabled && <p className="premiumFinePrint muted">Checkout is built in but remains disabled until the iyzico merchant credentials, server-side prices and production database are configured in Render.</p>}
+      {!enabled && <p className="premiumFinePrint muted">Premium checkout is temporarily unavailable.</p>}
       <p className="premiumFinePrint muted">Astrology readings are interpretive and intended for reflection/entertainment. They are not medical, legal, financial or mental-health advice.</p>
 
       {product && (
@@ -106,7 +106,7 @@ export default function PremiumReadings({ onCheckout, checkoutBusy = false, chec
             <span className="premiumKicker">Secure checkout</span>
             <h3>{selectedTitle}</h3>
             {selectedPrice && <div className="premiumPrice">₺{selectedPrice}</div>}
-            <p className="muted">Your card details will be entered on iyzico's hosted checkout page. The information below is sent securely to initialize that payment and is not exposed in the frontend bundle.</p>
+            <p className="muted">You’ll continue to a secure hosted payment page. AstroMYLA does not collect or store your card details.</p>
             <div className="checkoutGrid">
               <label>Full name<input required value={buyer.full_name} onChange={e=>setBuyer({...buyer,full_name:e.target.value})}/></label>
               <label>Email<input required type="email" value={buyer.email} onChange={e=>setBuyer({...buyer,email:e.target.value})}/></label>
@@ -118,7 +118,7 @@ export default function PremiumReadings({ onCheckout, checkoutBusy = false, chec
             </div>
             {product === "deep_reading" && <div className="questionFields"><strong>Optional personal questions</strong>{questions.map((q,i)=><textarea key={i} maxLength={500} placeholder={`Question ${i+1}`} value={q} onChange={e=>setQuestions(questions.map((x,j)=>j===i?e.target.value:x))}/>)}</div>}
             {checkoutError && <p className="error">{checkoutError}</p>}
-            <button className="premiumCta checkoutSubmit" disabled={checkoutBusy}>{checkoutBusy ? "Opening secure checkout…" : "Continue to iyzico"}</button>
+            <button className="premiumCta checkoutSubmit" disabled={checkoutBusy}>{checkoutBusy ? "Opening secure checkout…" : "Continue to secure checkout"}</button>
           </form>
         </div>
       )}
