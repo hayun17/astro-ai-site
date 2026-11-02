@@ -98,6 +98,13 @@ class AccountStore:
                     birth_json TEXT NOT NULL, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL
                 )
             """)
+            # Non-destructive upgrade for databases created by AstroMYLA v1.8/v1.9.
+            if self._is_postgres():
+                cur.execute("ALTER TABLE astromyla_saved_charts ADD COLUMN IF NOT EXISTS snapshot_json TEXT")
+            else:
+                columns = {str(row[1]) for row in cur.execute("PRAGMA table_info(astromyla_saved_charts)").fetchall()}
+                if "snapshot_json" not in columns:
+                    cur.execute("ALTER TABLE astromyla_saved_charts ADD COLUMN snapshot_json TEXT")
             conn.commit()
 
     def register(self, email: str, password: str, display_name: str) -> tuple[dict[str,Any], str]:
@@ -164,23 +171,26 @@ class AccountStore:
     def list_charts(self, user_id: str) -> list[dict[str,Any]]:
         with closing(self._connect()) as conn:
             cur = self._execute(conn,
-                "SELECT id,label,birth_json,created_at,updated_at FROM astromyla_saved_charts WHERE user_id=? ORDER BY updated_at DESC",
-                "SELECT id,label,birth_json,created_at,updated_at FROM astromyla_saved_charts WHERE user_id=%s ORDER BY updated_at DESC", (user_id,))
+                "SELECT id,label,birth_json,created_at,updated_at,snapshot_json FROM astromyla_saved_charts WHERE user_id=? ORDER BY updated_at DESC",
+                "SELECT id,label,birth_json,created_at,updated_at,snapshot_json FROM astromyla_saved_charts WHERE user_id=%s ORDER BY updated_at DESC", (user_id,))
             rows = cur.fetchall()
-        return [{"id":r[0],"label":r[1],"birth":json.loads(r[2]),"created_at":r[3],"updated_at":r[4]} for r in rows]
+        return [{"id":r[0],"label":r[1],"birth":json.loads(r[2]),"created_at":r[3],"updated_at":r[4],
+                 "natal_snapshot": json.loads(r[5]) if r[5] else None} for r in rows]
 
-    def save_chart(self, user_id: str, label: str, birth: BirthData) -> dict[str,Any]:
+    def save_chart(self, user_id: str, label: str, birth: BirthData, natal_snapshot: dict[str,Any] | None = None) -> dict[str,Any]:
         chart_id = "cht_" + secrets.token_urlsafe(10)
         now = int(time.time())
         label = " ".join(label.split())[:80] or birth.name or "Saved chart"
         birth_json = json.dumps(birth.model_dump(mode="json"), ensure_ascii=False)
+        snapshot_json = json.dumps(natal_snapshot, ensure_ascii=False) if natal_snapshot is not None else None
         with closing(self._connect()) as conn:
             self._execute(conn,
-                "INSERT INTO astromyla_saved_charts (id,user_id,label,birth_json,created_at,updated_at) VALUES (?,?,?,?,?,?)",
-                "INSERT INTO astromyla_saved_charts (id,user_id,label,birth_json,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s)",
-                (chart_id,user_id,label,birth_json,now,now))
+                "INSERT INTO astromyla_saved_charts (id,user_id,label,birth_json,created_at,updated_at,snapshot_json) VALUES (?,?,?,?,?,?,?)",
+                "INSERT INTO astromyla_saved_charts (id,user_id,label,birth_json,created_at,updated_at,snapshot_json) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                (chart_id,user_id,label,birth_json,now,now,snapshot_json))
             conn.commit()
-        return {"id":chart_id,"label":label,"birth":json.loads(birth_json),"created_at":now,"updated_at":now}
+        return {"id":chart_id,"label":label,"birth":json.loads(birth_json),"created_at":now,"updated_at":now,
+                "natal_snapshot": natal_snapshot}
 
     def delete_chart(self, user_id: str, chart_id: str) -> bool:
         with closing(self._connect()) as conn:

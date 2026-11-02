@@ -238,56 +238,72 @@ def _aspect_sentence(item: Dict[str, Any], a_name: str, b_name: str) -> str:
 
 
 def build_synastry_interpretation(chart_a: Dict[str, Any], chart_b: Dict[str, Any], aspects: List[Dict[str, Any]], overlays: Dict[str, Any] | None = None) -> str:
+    """Readable fallback that *always* names verified house clusters and cross-aspects.
+
+    Used if a generative provider is down or unavailable; never substitutes
+    invented charts or generic statements for missing birth-time evidence.
+    """
+    from .synastry_story import build_directional_house_stories
+
     a_name, b_name = _name(chart_a, "Person A"), _name(chart_b, "Person B")
-    overlays = overlays or {}
-    lines = [
-        f"### {a_name} × {b_name} — the relationship pattern",
-        "Synastry is a comparison of two complete natal charts. It is most useful when you read it as an interaction pattern: what feels easy, what repeatedly activates each person, and where the relationship asks for more awareness. It is not a compatibility score or a verdict on whether a relationship should exist.",
+    stories = build_directional_house_stories(overlays)
+    a_to_b, b_to_a = stories["a_to_b"], stories["b_to_a"]
+
+    def title(name: str) -> str:
+        return str(name).strip()[:80] or "Person"
+
+    lines: List[str] = [
+        f"### {title(a_name)} + {title(b_name)}: let's look at how this feels",
+        "Okay, here is what makes this comparison interesting: you're not just looking for a list of matching signs. "
+        "You're asking what each person brings into the other's world — and whether those patterns feel comfortable, exciting, or sometimes challenging. "
+        "Let's start with the houses, because the direction really matters.",
     ]
-    if chart_a.get("time_unknown") or chart_b.get("time_unknown"):
-        lines.append("One or both birth times are unknown, so time-sensitive Moon contacts, angles and any house overlay that depends on the unknown chart are left out rather than guessed.")
+
+    for heading, direction in [
+        (f"### What {title(a_name)} brings into {title(b_name)}'s life", a_to_b),
+        (f"### What {title(b_name)} brings into {title(a_name)}'s life", b_to_a),
+    ]:
+        lines.append("\n" + heading)
+        if not direction["available"]:
+            lines.append("We can't map planets into this person's houses without their exact birth time. I'd rather leave that part open than pretend we know it.")
+            continue
+        lines.append(direction["summary"])
+        for chapter in direction["chapters"]:
+            lines.append(f"\n**{chapter['headline']}**")
+            lines.append(chapter["opening"] + chapter["story"])
+            if chapter["count"] >= 2:
+                lines.append("That's worth noticing in day-to-day life: does this part of your connection keep showing up naturally, or does one of you feel pushed there?")
+
+    lines.append("\n### Where you click — and where things can get tricky")
     if not aspects:
-        lines.append("\nNo major cross-chart aspects fell inside the configured orbs, so there is not enough reliable inter-aspect data for a detailed synastry reading.")
-        return "\n".join(lines)
-
-    lines.append("\n### The strongest threads between you")
-    for item in aspects[:8]:
-        lines.append("- " + _aspect_sentence(item, a_name, b_name))
-
-    groups = {
-        "### Emotional closeness and safety": [x for x in aspects if "Moon" in {x["a"], x["b"]} or "Sun" in {x["a"], x["b"]}],
-        "### Communication and being understood": [x for x in aspects if "Mercury" in {x["a"], x["b"]}],
-        "### Attraction, desire and chemistry": [x for x in aspects if ({x["a"], x["b"]} & {"Venus","Mars","Pluto","Lilith"}) and ({x["a"], x["b"]} & {"Venus","Mars"})],
-        "### Commitment, growth and pressure points": [x for x in aspects if {x["a"], x["b"]} & {"Saturn","Jupiter","Uranus","Neptune","Pluto"}],
-    }
-    used: set[tuple[str,str,str]] = set()
-    for heading, rows in groups.items():
-        unique=[]
-        for x in rows:
-            key=(x["a"],x["aspect"],x["b"])
-            if key in used: continue
-            used.add(key); unique.append(x)
-        if not unique: continue
-        lines.append("\n"+heading)
-        for x in unique[:5]: lines.append("- "+_aspect_sentence(x,a_name,b_name))
-
-    a_in_b = overlays.get("a_in_b_houses") or []
-    b_in_a = overlays.get("b_in_a_houses") or []
-    if a_in_b or b_in_a:
-        lines.append("\n### Where you enter each other’s lives — house overlays")
-        for visitor, host, rows in [(a_name,b_name,a_in_b),(b_name,a_name,b_in_a)]:
-            if not rows: continue
-            for row in rows[:10]:
-                h=int(row["house"]); theme=_HOUSE_THEME.get(h,"this area of life")
-                lines.append(f"- **{visitor} {row['planet']} in {host}’s {h}th house** tends to activate {theme}. The planet describes what {visitor} brings; the house describes where {host} is most likely to feel it.")
+        lines.append("There aren't any major cross-chart aspects inside the orb setting you chose. That doesn't mean there's no connection; it means we shouldn't invent specific contacts to fill the gap.")
+    else:
+        warm = {"Trine":"A trine tends to feel easier to work with, as though you understand each other's rhythm without too much explaining.",
+                "Sextile":"A sextile offers a nice opening, especially when you choose to meet each other halfway.",
+                "Conjunction":"A conjunction turns up the volume; this can feel beautifully familiar or a little overwhelming, depending on how you handle it.",
+                "Square":"Squares can make for a very alive connection, but they're also where a conversation may need more patience.",
+                "Opposition":"An opposition can feel like two sides of the same coin: compelling, but neither of you should have to lose your own perspective."}
+        featured: List[Dict[str, Any]] = []
+        seen: set[tuple[str,str,str]] = set()
+        # Favor interpersonal planets in very tight contacts, without hiding the absolute tightest.
+        ranked = sorted(aspects, key=lambda a: (float(a.get("orb",99)), -sum(p in {"Moon","Sun","Venus","Mars","Mercury","Saturn"} for p in (a.get("a"),a.get("b")))))
+        for item in ranked:
+            key=(str(item["a"]),str(item["aspect"]),str(item["b"]))
+            if key in seen: continue
+            seen.add(key); featured.append(item)
+            if len(featured) == 6: break
+        for item in featured:
+            lines.append(f"\n**{title(a_name)}'s {item['a']} {item['aspect'].lower()} {title(b_name)}'s {item['b']} ({float(item['orb']):.2f}° orb).** " + warm.get(item["aspect"],"This links two different parts of how you relate.") +
+                         " In practical terms, notice when " + _BODY_THEME.get(item['a'],str(item['a']).lower()) +
+                         " meets " + _BODY_THEME.get(item['b'],str(item['b']).lower()) + ".")
 
     lines.extend([
-        "\n### What to pay attention to in real life",
-        "The tightest aspects usually speak the loudest, but repetition matters just as much: if several contacts keep pointing toward communication, autonomy, reassurance, attraction or boundaries, that repeated theme is more useful than isolating one dramatic aspect.",
-        "Notice directionality too. A planet landing in the other person’s house is experienced from two sides: one person brings the planetary function, while the other experiences it in a particular area of life. Swapping the inner/outer chart on the bi-wheel helps you see both perspectives.",
-        "The most useful question is not ‘Is this good or bad?’ but ‘What does this connection reliably bring out in each of us, and do we like how we handle that together?’",
+        "\n### So what should you actually do with this?",
+        "Here's the part I'd pay attention to: the house clusters tell you *where* the relationship tends to show up, and the cross-chart aspects tell you *how* your styles meet. Neither decides the future for you.",
+        "Ask each other: what feels effortless between us? Where do we keep talking past each other? When one of us feels exposed, what would make it feel safer to be honest?",
+        "If you only remember one thing, make it this: you don't need a perfect chart match. You need to like who you're becoming around each other — and how you treat each other when things aren't perfect.",
     ])
-    return "\n".join(lines)
+    return "\n\n".join(lines)
 
 
 def _placement_line(name: str, p: Dict[str, Any]) -> str | None:

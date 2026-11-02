@@ -13,6 +13,7 @@ import AccountPanel from "./components/AccountPanel";
 import CalculationProgress from "./components/CalculationProgress";
 import { ConnectionProfile, CompositeSignature } from "./components/ResultInsights";
 import { NatalSignatureSuite, MylaMatch } from "./components/SignatureInsights";
+import HouseOverlayStories from "./components/HouseOverlayStories";
 import { fetchWithTimeout, geocodePlace, readApiError } from "./lib/api";
 
 type Mode = "natal" | "transits" | "synastry" | "composite" | "astrocartography";
@@ -180,6 +181,8 @@ export default function App() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
+  const [calculatedBirth, setCalculatedBirth] = useState<{a:any;b?:any}|null>(null);
+  const [saveRequest, setSaveRequest] = useState<{id:number;slot:"A"|"B";birth:any}|null>(null);
   const [progress, setProgress] = useState({percent:0,label:""});
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
@@ -211,7 +214,14 @@ export default function App() {
   function changeMode(next: Mode) {
     setMode(next);
     setResult(null);
+    setCalculatedBirth(null);
     setError(null);
+  }
+
+  function requestSave(slot:"A"|"B") {
+    const birth = slot === "B" ? calculatedBirth?.b : calculatedBirth?.a;
+    if (!birth) return;
+    setSaveRequest(previous => ({id: (previous?.id ?? 0) + 1, slot, birth}));
   }
 
   async function postJson(path: string, payload: any) {
@@ -228,12 +238,14 @@ export default function App() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setCalculatedBirth(null);
     setProgress({percent:6,label:"Validating your birth data"});
     let timer: number | undefined;
     try {
       setProgress({percent:14,label:"Resolving place & historical timezone"});
       const a = await prepareBirth(personA, style, focus);
       let payloadResult: any;
+      let b: any = null;
       setProgress({percent:32,label:"Calculating planetary positions"});
       timer = window.setInterval(() => setProgress(prev => ({...prev, percent: Math.min(92, prev.percent + (prev.percent < 65 ? 4 : 1))})), 650);
       if (mode === "natal") {
@@ -248,7 +260,7 @@ export default function App() {
         payloadResult = await postJson("/api/interpret/astrocartography", a);
       } else {
         setProgress({percent:28,label:"Preparing both birth charts"});
-        const b = await prepareBirth(personB, style, "relationships");
+        b = await prepareBirth(personB, style, "relationships");
         const payload = { person_a: a, person_b: b, style, orb_profile: orbProfile };
         setProgress({percent:52,label: mode === "synastry" ? "Comparing inter-chart aspects" : "Building midpoint composite"});
         payloadResult = await postJson(mode === "synastry" ? "/api/interpret/synastry" : "/api/interpret/composite", payload);
@@ -256,6 +268,7 @@ export default function App() {
       if (timer) window.clearInterval(timer);
       setProgress({percent:96,label:"Finishing your interpretation"});
       setResult(payloadResult);
+      setCalculatedBirth({a, ...(b ? {b} : {})});
       setProgress({percent:100,label:"Your chart is ready ✨"});
       window.setTimeout(()=>setProgress({percent:0,label:""}), 900);
     } catch (e: any) {
@@ -356,7 +369,7 @@ export default function App() {
           <p>Personal astrology, current transits, relationship maps and AstroMYLA signature insights — with downloadable reports.</p>
         </div>
         <div className="heroActions">
-          <AccountPanel apiBase={base} prepareBirthA={() => prepareBirth(personA, style, focus)} prepareBirthB={() => prepareBirth(personB, style, "relationships")} showPersonB={mode === "synastry" || mode === "composite"} onLoadBirth={(birth,slot)=>{if(slot === "B") setPersonB(draftFromBirth(birth)); else setPersonA(draftFromBirth(birth)); setResult(null);}} />
+          <AccountPanel apiBase={base} saveRequest={saveRequest} onLoadBirth={(birth,slot,snapshot)=>{if(slot === "B") {setPersonB(draftFromBirth(birth)); setMode("synastry"); setResult(null);} else {setPersonA(draftFromBirth(birth)); setMode("natal"); setResult(snapshot ? {...snapshot, interpretation:"Your saved natal chart is back! Generate Birth Chart again whenever you want a fresh long-form reading."} : null);} setCalculatedBirth(snapshot && slot === "A" ? {a:birth} : null);}} />
           {IS_DEV && (
             <label className="devApiField">API Base (dev only)<input value={apiBase} onChange={(e) => setApiBase(e.target.value)} /></label>
           )}
@@ -415,6 +428,7 @@ export default function App() {
               <button className="secondary downloadButton" onClick={downloadPdf} disabled={pdfLoading}>{pdfLoading ? "Preparing PDF…" : "Download PDF report"}</button>
             </div>
 
+            {calculatedBirth && <div className="resultSaveBanner"><div><span>✧ MADE A CHART WORTH KEEPING?</span><p>Save it once. Come back to it whenever you like.</p></div><div className="resultSaveButtons"><button type="button" onClick={()=>requestSave("A")}>♡ {calculatedBirth.b ? "Save Person A" : "Save this chart"}</button>{calculatedBirth.b && <button type="button" className="secondary" onClick={()=>requestSave("B")}>♡ Save Person B</button>}</div></div>}
             {mode === "natal" && <>
               <NatalSignatureSuite data={result.astromyla} />
               <ChartPanel chart={result.chart} />
@@ -442,7 +456,8 @@ export default function App() {
                 />
                 <ConnectionProfile profile={result.synastry?.connection_profile} />
                 <MylaMatch match={result.synastry?.myla_match} />
-                <h3>Cross-chart aspects</h3>
+                <HouseOverlayStories stories={result.synastry?.house_stories} personA={personA.name} personB={personB.name}/>
+                <details className="mylaTechnicalDetails"><summary>View technical cross-chart aspects and all house placements</summary><h3>Cross-chart aspects</h3>
                 <SynastryAspectTable aspects={result.synastry?.aspects || []} aName={personA.name} bName={personB.name} />
                 {(result.synastry?.house_overlays?.a_in_b_houses?.length > 0 || result.synastry?.house_overlays?.b_in_a_houses?.length > 0) && (
                   <>
@@ -467,7 +482,8 @@ export default function App() {
                     </div>
                   </>
                 )}
-                <p className="muted methodNote">The profile above measures which relationship themes are most activated. It is not a probability that the relationship will succeed.</p>
+                </details>
+                <p className="muted methodNote">This is a symbolic interpretation of your real chart data, not a prediction of relationship success.</p>
               </>
             )}
 
