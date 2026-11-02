@@ -196,8 +196,24 @@ export default function App() {
     const payment = params.get("payment");
     const order = params.get("order");
     if (payment === "success" && order) {
-      setPaidOrderToken(order);
-      setPaymentNotice("Payment verified ✨ Your premium report is ready to generate and download.");
+      setPaymentNotice("Checking your payment with the server…");
+      let active = true;
+      fetchWithTimeout(`${DEFAULT_API_BASE}/api/orders/${encodeURIComponent(order)}`, {method: "GET"}, 30000)
+        .then(async response => {
+          if (!response.ok) throw new Error("We couldn't confirm that order yet.");
+          return response.json();
+        })
+        .then(data => {
+          if (!active) return;
+          if (data.status === "paid") {
+            setPaidOrderToken(order);
+            setPaymentNotice("Your payment is verified. Your reading is ready to create and download ✨");
+          } else {
+            setPaidOrderToken(null);
+            setPaymentNotice("Your payment hasn't been confirmed yet. Please contact support if you were charged.");
+          }
+        }).catch(() => { if (active) setPaymentNotice("We couldn't verify your payment yet. Please contact support if you were charged."); });
+      return () => { active = false; };
     } else if (payment === "failed") {
       setPaymentNotice("The payment was not completed. No premium report was unlocked.");
     }
@@ -428,14 +444,18 @@ export default function App() {
               <button className="secondary downloadButton" onClick={downloadPdf} disabled={pdfLoading}>{pdfLoading ? "Preparing PDF…" : "Download PDF report"}</button>
             </div>
 
-            {calculatedBirth && <div className="resultSaveBanner"><div><span>✧ MADE A CHART WORTH KEEPING?</span><p>Save it once. Come back to it whenever you like.</p></div><div className="resultSaveButtons"><button type="button" onClick={()=>requestSave("A")}>♡ {calculatedBirth.b ? "Save Person A" : "Save this chart"}</button>{calculatedBirth.b && <button type="button" className="secondary" onClick={()=>requestSave("B")}>♡ Save Person B</button>}</div></div>}
+            {calculatedBirth && <div className="resultSaveBanner"><div><span>✦ YOUR PERSONAL CHART LIBRARY</span><p>Want to come back to this? Give your chart a name and keep it in your account.</p></div><div className="resultSaveButtons"><button type="button" onClick={()=>requestSave("A")}>♡ {calculatedBirth.b ? "Save Person A" : "Save this chart"}</button>{calculatedBirth.b && <button type="button" className="secondary" onClick={()=>requestSave("B")}>♡ Save Person B</button>}</div></div>}
             {mode === "natal" && <>
-              <NatalSignatureSuite data={result.astromyla} />
+              <NatalSignatureSuite data={result.astromyla} chart={result.chart} />
               <ChartPanel chart={result.chart} />
             </>}
 
             {mode === "transits" && (
               <>
+                <div className="cosmicSkyCards">
+                  <div><span>☿ MERCURY RETROGRADE</span><strong>{result.transits?.popular_sky?.mercury_retrograde === true ? "Yes, Mercury is retrograde" : result.transits?.popular_sky?.mercury_retrograde === false ? "No, Mercury is direct" : "Unavailable"}</strong><p>{result.transits?.popular_sky?.mercury_sign ? `Mercury in ${result.transits.popular_sky.mercury_sign} · apparent geocentric motion` : "Current planetary data unavailable"}</p></div>
+                  <div><span>♄ SATURN RETURN CHECK</span><strong>{result.transits?.popular_sky?.saturn_return_within_3deg ? "Close to your natal Saturn" : "Not within 3° of natal Saturn"}</strong><p>{result.transits?.popular_sky?.saturn_return_distance_deg != null ? `${result.transits.popular_sky.saturn_return_distance_deg}° from your natal Saturn · current snapshot` : "Saturn data unavailable"}</p></div>
+                </div>
                 <TransitBiWheel natal={result.natal} transits={result.transits} />
                 <div className="transitSummaryGrid">
                   <div className="overlayCard"><strong>Strongest active transits</strong><div className="overlayList">{(result.transits?.top_aspects||[]).slice(0,8).map((x:any,i:number)=><span key={i}><b>{x.transit} {x.aspect} natal {x.natal}</b> · {Number(x.orb).toFixed(2)}° · {x.applying?"applying":"separating"}</span>)}</div></div>

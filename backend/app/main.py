@@ -8,6 +8,7 @@ import threading
 import time
 from datetime import datetime
 from decimal import Decimal
+from pydantic import BaseModel, Field
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from collections import defaultdict, deque
 from typing import Any
@@ -36,7 +37,8 @@ from .relationship import (
 from .astrocartography import build_astrocartography_interpretation, compute_astrocartography
 from .pdf_report import build_report_pdf
 from .premium import premium_prompt
-from .payment import (OrderStore, PaymentConfigurationError, PaymentProviderError, PRODUCTS, initialize_checkout, payment_ready, public_catalog, retrieve_checkout, _price_for)
+from .payment import (OrderStore, PaymentConfigurationError, PaymentProviderError, PRODUCTS, initialize_checkout, payment_ready, public_catalog, retrieve_checkout, _price_for, check_verified_payment, verify_webhook_v3)
+from .receipt_email import send_payment_receipt
 from .transits import build_daily_transit_interpretation, compute_personal_transits
 from .accounts import AccountStore, AccountConfigurationError, AccountAuthError
 from .signature import build_natal_signature_suite, build_myla_match
@@ -44,7 +46,7 @@ from .synastry_story import build_directional_house_stories
 
 load_dotenv()
 
-APP_VERSION = "1.9.2"
+APP_VERSION = "1.10.0"
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production").lower()
 EXPOSE_DEBUG_DATA = os.getenv("EXPOSE_DEBUG_DATA", "false").lower() in {"1", "true", "yes", "on"}
 PREMIUM_REPORT_TOKEN = os.getenv("PREMIUM_REPORT_TOKEN", "").strip()
@@ -74,7 +76,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=allow_credentials,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
     expose_headers=["Content-Disposition"],
     max_age=600,
@@ -633,9 +635,10 @@ def interpret_daily(payload: TransitRequest, request: Request):
 @app.get("/api/account/config")
 def account_config():
     try:
-        AccountStore()
-        return {"ready": True}
-    except AccountConfigurationError:
+        store = AccountStore()
+        return {"ready": store.check_connection()}
+    except Exception:
+        # Don't disclose private database configuration or topology to browsers.
         return {"ready": False}
 
 
@@ -690,6 +693,32 @@ def account_save_chart(payload: SavedChartRequest, request: Request):
     natal = _compute_chart(payload.birth)
     snapshot = {"chart": natal, "astromyla": build_natal_signature_suite(natal)}
     return {"chart": store.save_chart(user["id"], payload.label, payload.birth, natal_snapshot=snapshot)}
+
+
+@app.get("/api/account/charts/{chart_id}")
+def account_get_chart(chart_id: str, request: Request):
+    store, user, _ = _require_user(request)
+    chart = store.get_chart(user["id"], chart_id)
+    if chart is None:
+        raise HTTPException(status_code=404, detail="Saved chart not found")
+    return {"chart": chart}
+
+
+class RenameChartRequest(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+
+
+@app.patch("/api/account/charts/{chart_id}")
+def account_rename_chart(chart_id: str, payload: RenameChartRequest, request: Request):
+    _enforce_rate_limit(request)
+    store, user, _ = _require_user(request)
+    try:
+        updated = store.rename_chart(user["id"], chart_id, payload.label)
+    except AccountAuthError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not updated:
+        raise HTTPException(status_code=404, detail="Saved chart not found")
+    return {"chart": store.get_chart(user["id"], chart_id)}
 
 
 @app.delete("/api/account/charts/{chart_id}")
@@ -854,7 +883,7 @@ def premium_natal_report(
 
 @app.get("/api/payments/config")
 def payments_config():
-    return {"provider": "iyzico", "ready": payment_ready(), "products": public_catalog()}
+    return {"ready": payment_ready(), "sandbox": os.getenv("PAYMENT_MODE", "sandbox") == "sandbox", "products": public_catalog()}
 
 
 @app.post("/api/payments/checkout")
@@ -911,17 +940,57 @@ async def iyzico_callback(request: Request):
         if not order or order.payment_token != token:
             raise PaymentProviderError("Order/token mismatch")
         response = retrieve_checkout(token=token, conversation_id=order.id)
-        paid = str(response.get("paymentStatus") or "").upper() == "SUCCESS" and str(response.get("basketId") or "") == order.id
-        if paid:
-            # Amount and currency are verified against the server-side order before fulfillment.
-            if str(response.get("currency") or "") != order.currency or Decimal(str(response.get("paidPrice"))) != Decimal(order.amount):
-                raise PaymentProviderError("Verified payment amount did not match the order")
-            store.mark_paid(order.id, str(response.get("paymentId") or ""))
+        if check_verified_payment(response, order):
+            first_verification = store.mark_paid(order.id, str(response["paymentId"]))
+            try:
+                if first_verification:
+                    send_payment_receipt(to_email=order.email, product=PRODUCTS[order.product]["label"],
+                    price=order.amount, order_link=f"{site}/?payment=success&order={order.public_token}")
+            except Exception:
+                # A mail outage must never revoke a verified payment.
+                pass
             return RedirectResponse(f"{site}/?payment=success&order={order.public_token}", status_code=303)
         store.mark_failed(order.id)
     except Exception:
         pass
     return RedirectResponse(f"{site}/?payment=failed", status_code=303)
+
+
+@app.post("/api/payments/iyzico/webhook")
+async def iyzico_webhook(request: Request):
+    # Always verify signature AND independently retrieve the official payment result.
+    # Never use a webhook's status alone to mark an order paid.
+    if not payment_ready():
+        raise HTTPException(status_code=503, detail="Payment service unavailable")
+    try:
+        payload = await request.json()
+        if not isinstance(payload, dict) or not verify_webhook_v3(payload, request.headers.get("X-IYZ-SIGNATURE-V3", "")):
+            raise HTTPException(status_code=403, detail="Invalid webhook signature")
+        store = OrderStore()
+        order = store.get_id(str(payload.get("paymentConversationId") or ""))
+        if not order or order.payment_token != str(payload.get("token") or ""):
+            raise HTTPException(status_code=404, detail="Order not found")
+        if order.status == "paid":
+            return {"ok": True}
+        verified = retrieve_checkout(token=order.payment_token, conversation_id=order.id)
+        if check_verified_payment(verified, order):
+            first_verification = store.mark_paid(order.id, str(verified["paymentId"]))
+            try:
+                site = os.getenv("PUBLIC_SITE_URL", "https://astromyla.com").rstrip("/")
+                if first_verification:
+                    send_payment_receipt(to_email=order.email, product=PRODUCTS[order.product]["label"],
+                    price=order.amount, order_link=f"{site}/?payment=success&order={order.public_token}")
+            except Exception:
+                pass
+            return {"ok": True}
+        if str(payload.get("status", "")).upper() == "FAILURE":
+            store.mark_failed(order.id)
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception:
+        # Safe to retry on transient provider/database failures.
+        raise HTTPException(status_code=503, detail="Unable to verify payment")
 
 
 @app.get("/api/orders/{public_token}")

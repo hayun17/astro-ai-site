@@ -91,13 +91,35 @@ export default function AccountPanel({ apiBase, saveRequest, onLoadBirth }: Prop
     if (!clean) { setError("Give this chart a name so you can find it later."); return; }
     setBusy(true); setError("");
     try {
-      const data = await api("/api/account/charts", { method: "POST", body: JSON.stringify({ label: clean, birth: pending.birth }) });
-      // Trust the server response, not an optimistic local-only save.
-      setCharts(previous => [data.chart, ...previous]);
-      setNotice(`Saved “${data.chart.label}” — including its calculated natal chart — to your account.`);
+      const created = await api("/api/account/charts", { method: "POST", body: JSON.stringify({ label: clean, birth: pending.birth }) });
+      if (!created?.chart?.id) throw new Error("The server didn't confirm the save. Please retry.");
+      // Read back from persistent storage. Never claim saved on an optimistic client state.
+      const verified = await api(`/api/account/charts/${encodeURIComponent(created.chart.id)}`);
+      if (!verified?.chart?.id || verified.chart.id !== created.chart.id || !verified.chart.natal_snapshot?.chart) {
+        throw new Error("The saved chart couldn't be verified. Please try again.");
+      }
+      const library = await api("/api/account/charts");
+      if (!Array.isArray(library?.charts) || !library.charts.some((c: SavedChart) => c.id === created.chart.id)) {
+        throw new Error("The chart hasn't appeared in your account yet. Please retry.");
+      }
+      setCharts(library.charts);
+      setNotice(`Saved “${verified.chart.label}” to your account. It will be here when you sign in again.`);
       setPending(null); setLabel("");
     } catch (e: any) { setError(e.message || "Couldn't save this chart. Please try again."); }
     finally { setBusy(false); }
+  }
+
+  async function rename(id: string, previous: string) {
+    const next = window.prompt("Give this chart a new name", previous)?.trim();
+    if (!next || next === previous) return;
+    setBusy(true); setError("");
+    try {
+      await api(`/api/account/charts/${encodeURIComponent(id)}`, {method: "PATCH", body: JSON.stringify({label: next})});
+      const library = await api("/api/account/charts");
+      setCharts(library.charts || []);
+      setNotice(`Renamed “${previous}” to “${next}”.`);
+    } catch (e:any) {setError(e.message || "Couldn't rename this chart.");}
+    finally {setBusy(false);}
   }
 
   async function erase(id: string, name: string) {
@@ -109,6 +131,18 @@ export default function AccountPanel({ apiBase, saveRequest, onLoadBirth }: Prop
       setNotice(`“${name}” was deleted.`);
     } catch (e: any) { setError(e.message || "Couldn't delete chart."); }
     finally { setBusy(false); }
+  }
+
+  async function loadChart(chart: SavedChart, slot: "A" | "B") {
+    setBusy(true); setError("");
+    try {
+      const data = await api(`/api/account/charts/${encodeURIComponent(chart.id)}`);
+      const saved = data?.chart;
+      if (!saved?.birth || !saved?.natal_snapshot?.chart) throw new Error("This older chart needs to be saved again to open its full result.");
+      onLoadBirth(saved.birth, slot, saved.natal_snapshot);
+      setOpen(false);
+    } catch (e:any) {setError(e.message || "Couldn't open the saved chart.");}
+    finally {setBusy(false);}
   }
 
   async function logOut() {
@@ -156,9 +190,9 @@ export default function AccountPanel({ apiBase, saveRequest, onLoadBirth }: Prop
             {charts.map(c => <div className="savedChartItem" key={c.id}>
               <div className="savedChartInfo"><strong>{c.label}</strong><span>{c.birth?.birthplace || "Birthplace not named"} · {c.birth?.day}/{c.birth?.month}/{c.birth?.year}</span></div>
               <div className="savedChartActions">
-                <button type="button" className="secondary" onClick={() => { onLoadBirth(c.birth, "A", c.natal_snapshot); setOpen(false); }}>{c.natal_snapshot ? "Open chart / Use as A" : "Use as A"}</button>
-                <button type="button" className="secondary" onClick={() => { onLoadBirth(c.birth, "B", c.natal_snapshot); setOpen(false); }}>Use as B</button>
-                <button type="button" className="dangerLink" disabled={busy} onClick={() => void erase(c.id, c.label)}>Delete</button>
+                <button type="button" className="secondary" onClick={() => void loadChart(c, "A")}>{c.natal_snapshot ? "Open chart / Use as A" : "Use as A"}</button>
+                <button type="button" className="secondary" onClick={() => void loadChart(c, "B")}>Use as B</button>
+                <button type="button" className="secondary" disabled={busy} onClick={() => void rename(c.id, c.label)}>Rename</button><button type="button" className="dangerLink" disabled={busy} onClick={() => void erase(c.id, c.label)}>Delete</button>
               </div>
             </div>)}
           </div>}

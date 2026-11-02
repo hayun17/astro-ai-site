@@ -37,6 +37,23 @@ PLANET_NOTES = {
     "Chiron": "Chiron may highlight sensitivities and opportunities for care",
     "Lilith": "Lilith can activate boundaries and less-conventional feelings",
 }
+PLANET_HOUSE_EXAMPLES = {
+    3: {"Moon":"The Moon visitor may make it easier for the house person to speak about everyday feelings.",
+        "Mercury":"The Mercury visitor brings questions, messages and the kind of conversation that keeps going after midnight.",
+        "Venus":"Venus can soften the tone here: affection may show up as kind words, teasing or remembering small details."},
+    4: {"Moon":"Moon can touch the house person's private, familiar side — comfort can deepen, but old sensitivities might surface.",
+        "Venus":"Venus may make home and quiet time together feel especially inviting."},
+    5: {"Venus":"Venus tends to amplify the playful 'I like being seen by you' quality of this house.",
+        "Mars":"Mars can add initiative and flirtation, though the pace needs to feel good to both people.",
+        "Sun":"The Sun visitor can make this side of the house person's self-expression feel noticed."},
+    7: {"Moon":"The Moon visitor may make the house person think about emotional partnership and daily companionship.",
+        "Venus":"Venus can make the visitor feel like a natural candidate for one-to-one affection — not a guarantee of commitment.",
+        "Saturn":"Saturn makes expectations, responsibility and long-term boundaries harder to ignore."},
+    8: {"Moon":"Moon can bring vulnerability and trust needs into sharp focus.",
+        "Venus":"Venus may bring attraction to private, intimate conversations, but trust still has to be earned.",
+        "Mars":"Mars can intensify the pull while making boundaries and consent especially important."},
+}
+
 IMPORTANT = {"Moon": 10, "Sun": 9, "Venus": 8, "Mars": 8, "Mercury": 7, "Saturn": 7, "Jupiter": 6, "TrueNode": 5, "Pluto": 4, "Uranus": 3, "Neptune": 3, "Chiron": 2, "Lilith": 2}
 
 
@@ -60,7 +77,8 @@ def _direction(rows: list[dict[str, Any]], visitor: str, host: str) -> dict[str,
             intro += f"That's a real concentration in {title} — not just one isolated contact. "
         else:
             intro += f"That's a connection to {title}. "
-        body = theme + " " + "; ".join(PLANET_NOTES[p] for p in ordered_planets[:3]) + "."
+        specific = [PLANET_HOUSE_EXAMPLES.get(house,{}).get(p) or PLANET_NOTES[p]+"." for p in ordered_planets[:3]]
+        body = theme + " " + " ".join(specific)
         chapters.append({
             "house": house, "count": len(planets), "planets": ordered_planets,
             "headline": f"House {house} · {title}", "opening": intro,

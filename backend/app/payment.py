@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import hmac
+import hashlib
+from contextlib import closing
 import os
 import secrets
 import sqlite3
@@ -52,14 +55,71 @@ def public_catalog() -> dict[str, Any]:
 
 
 def payment_ready() -> bool:
-    if not (os.getenv("IYZICO_API_KEY", "").strip() and os.getenv("IYZICO_SECRET_KEY", "").strip() and os.getenv("DATABASE_URL", "").strip()):
+    # No real payments are accepted just because someone pasted API keys.
+    if os.getenv("PAYMENTS_ENABLED", "false").lower() not in {"1", "yes", "true", "on"}:
+        return False
+    api_key = os.getenv("IYZICO_API_KEY", "").strip()
+    secret = os.getenv("IYZICO_SECRET_KEY", "").strip()
+    url = os.getenv("IYZICO_BASE_URL", "").rstrip("/")
+    mode = os.getenv("PAYMENT_MODE", "sandbox").strip().lower()
+    if not api_key or not secret or not os.getenv("DATABASE_URL", "").strip():
+        return False
+    if mode == "live":
+        # Do not charge live customers unless reports can be generated, customers
+        # can receive their order link, and the merchant explicitly approved launch.
+        from .receipt_email import receipt_email_ready
+        if not os.getenv("OPENAI_API_KEY", "").strip() or not receipt_email_ready():
+            return False
+        if url != "https://api.iyzipay.com" or api_key.startswith("sandbox-"):
+            return False
+        if os.getenv("PAYMENTS_LIVE_APPROVED", "false").lower() not in {"1","yes","true","on"}:
+            return False
+    elif mode == "sandbox":
+        if url != "https://sandbox-api.iyzipay.com" or not api_key.startswith("sandbox-"):
+            return False
+    else:
         return False
     try:
         _price_for("personalized_reading")
         _price_for("deep_reading")
-    except PaymentConfigurationError:
+        # A missing or unavailable database must not advertise a usable checkout.
+        store = OrderStore()
+        return store.check_connection()
+    except Exception:
         return False
-    return True
+
+
+def verify_webhook_v3(payload: dict[str, Any], signature: str) -> bool:
+    """iyzico Checkout Form (HPP) signature V3, fail closed."""
+    fields = ("iyziEventType", "iyziPaymentId", "token", "paymentConversationId", "status")
+    if not signature or any(not str(payload.get(key) or "") for key in fields):
+        return False
+    if payload.get("iyziEventType") != "CHECKOUT_FORM_AUTH":
+        return False
+    secret = os.getenv("IYZICO_SECRET_KEY", "")
+    if not secret:
+        return False
+    data = secret + "".join(str(payload[k]) for k in fields)
+    expected = hmac.new(secret.encode("utf-8"), data.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected.lower(), str(signature).lower())
+
+
+def check_verified_payment(response: dict[str, Any], order: 'Order') -> bool:
+    """Never grant report access based on a browser query string or webhook status."""
+    try:
+        return (
+            response.get("status") == "success" and
+            str(response.get("paymentStatus", "")).upper() == "SUCCESS" and
+            str(response.get("conversationId", "")) == order.id and
+            str(response.get("basketId", "")) == order.id and
+            str(response.get("token", "")) == order.payment_token and
+            str(response.get("currency", "")) == order.currency and
+            Decimal(str(response.get("paidPrice"))) == Decimal(order.amount) and
+            Decimal(str(response.get("price"))) == Decimal(order.amount) and
+            bool(response.get("paymentId"))
+        )
+    except (ValueError, ArithmeticError):
+        return False
 
 
 def _iyzico_options() -> dict[str, str]:
@@ -104,6 +164,11 @@ class OrderStore:
             self.url = f"sqlite:///{Path(__file__).resolve().parents[1] / 'data' / 'orders-dev.sqlite3'}"
         self._ensure_schema()
 
+    def check_connection(self) -> bool:
+        with closing(self._connect()) as conn:
+            row = conn.cursor().execute("SELECT 1").fetchone()
+            return bool(row and int(row[0]) == 1)
+
     def _is_postgres(self) -> bool:
         return self.url.startswith("postgres://") or self.url.startswith("postgresql://")
 
@@ -119,7 +184,7 @@ class OrderStore:
         return sqlite3.connect(path)
 
     def _ensure_schema(self) -> None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             cur = conn.cursor()
             if self._is_postgres():
                 cur.execute("""
@@ -147,7 +212,7 @@ class OrderStore:
             amount=amount, currency="TRY", email=email, status="created", payment_token=None, payment_id=None,
             request_json=json.dumps(request_payload, ensure_ascii=False), created_at=int(time.time()), paid_at=None,
         )
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.cursor().execute(
                 "INSERT INTO astromyla_orders (id,public_token,product,tier,amount,currency,email,status,payment_token,payment_id,request_json,created_at,paid_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 if not self._is_postgres() else
@@ -161,19 +226,19 @@ class OrderStore:
         return Order(*row) if row else None
 
     def get_public(self, public_token: str) -> Order | None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             cur = conn.cursor()
             cur.execute("SELECT id,public_token,product,tier,amount,currency,email,status,payment_token,payment_id,request_json,created_at,paid_at FROM astromyla_orders WHERE public_token=?" if not self._is_postgres() else "SELECT id,public_token,product,tier,amount,currency,email,status,payment_token,payment_id,request_json,created_at,paid_at FROM astromyla_orders WHERE public_token=%s", (public_token,))
             return self._row_to_order(cur.fetchone())
 
     def get_id(self, order_id: str) -> Order | None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             cur = conn.cursor()
             cur.execute("SELECT id,public_token,product,tier,amount,currency,email,status,payment_token,payment_id,request_json,created_at,paid_at FROM astromyla_orders WHERE id=?" if not self._is_postgres() else "SELECT id,public_token,product,tier,amount,currency,email,status,payment_token,payment_id,request_json,created_at,paid_at FROM astromyla_orders WHERE id=%s", (order_id,))
             return self._row_to_order(cur.fetchone())
 
     def get_report(self, order_id: str) -> tuple[bytes, str] | None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             cur = conn.cursor()
             cur.execute("SELECT report_pdf, report_filename FROM astromyla_orders WHERE id=?" if not self._is_postgres() else "SELECT report_pdf, report_filename FROM astromyla_orders WHERE id=%s", (order_id,))
             row = cur.fetchone()
@@ -182,7 +247,7 @@ class OrderStore:
             return bytes(row[0]), str(row[1] or "astromyla-premium-reading.pdf")
 
     def save_report(self, order_id: str, content: bytes, filename: str) -> None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             cur = conn.cursor()
             cur.execute("UPDATE astromyla_orders SET report_pdf=?, report_filename=? WHERE id=?" if not self._is_postgres() else "UPDATE astromyla_orders SET report_pdf=%s, report_filename=%s WHERE id=%s", (content, filename, order_id))
             conn.commit()
@@ -190,18 +255,30 @@ class OrderStore:
     def set_payment_token(self, order_id: str, token: str) -> None:
         self._update(order_id, status="pending", payment_token=token)
 
-    def mark_paid(self, order_id: str, payment_id: str | None) -> None:
-        self._update(order_id, status="paid", payment_id=payment_id, paid_at=int(time.time()))
+    def mark_paid(self, order_id: str, payment_id: str | None) -> bool:
+        # Idempotent callback and webhook: retries never revoke a paid order.
+        with closing(self._connect()) as conn:
+            cur = conn.cursor()
+            if self._is_postgres():
+                cur.execute("UPDATE astromyla_orders SET status='paid',payment_id=%s,paid_at=%s WHERE id=%s AND status <> 'paid'", (payment_id,int(time.time()),order_id))
+            else:
+                cur.execute("UPDATE astromyla_orders SET status='paid',payment_id=?,paid_at=? WHERE id=? AND status <> 'paid'", (payment_id,int(time.time()),order_id))
+            conn.commit()
+            return bool(cur.rowcount)
 
     def mark_failed(self, order_id: str) -> None:
-        self._update(order_id, status="failed")
+        with closing(self._connect()) as conn:
+            cur = conn.cursor()
+            sql = "UPDATE astromyla_orders SET status='failed' WHERE id=%s AND status NOT IN ('paid','failed')" if self._is_postgres() else "UPDATE astromyla_orders SET status='failed' WHERE id=? AND status NOT IN ('paid','failed')"
+            cur.execute(sql, (order_id,))
+            conn.commit()
 
     def _update(self, order_id: str, **fields: Any) -> None:
         if not fields:
             return
         allowed = {"status", "payment_token", "payment_id", "paid_at"}
         fields = {k: v for k, v in fields.items() if k in allowed}
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             cur = conn.cursor()
             if self._is_postgres():
                 set_sql = ",".join(f"{k}=%s" for k in fields)
@@ -282,6 +359,8 @@ def retrieve_checkout(*, token: str, conversation_id: str) -> dict[str, Any]:
     if response.get("status") != "success":
         raise PaymentProviderError(str(response.get("errorMessage") or "iyzico checkout verification failed"))
     sig = response.get("signature")
+    if not sig:
+        raise PaymentProviderError("Unsigned checkout retrieval cannot be trusted")
     if sig:
         values = [
             response.get("paymentStatus"), response.get("paymentId"), response.get("currency"), response.get("basketId"),

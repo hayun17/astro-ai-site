@@ -122,7 +122,21 @@ def compute_personal_transits(natal: dict[str, Any], birth: Any, target_date: da
     aspects = _aspect_rows(natal, bodies, future)
     houses = _house_overlays(natal, birth, bodies)
     public_bodies = {k:v for k,v in bodies.items() if k in TRANSIT_BODIES and v.get("available", True) and v.get("lon") is not None}
+    mercury = public_bodies.get("Mercury") or {}
+    saturn_transit = public_bodies.get("Saturn") or {}
+    saturn_natal = ((natal.get("planets") or {}).get("Saturn") or {})
+    saturn_distance = None
+    if saturn_transit.get("lon") is not None and saturn_natal.get("lon") is not None:
+        saturn_distance = angular_separation(float(saturn_transit["lon"]), float(saturn_natal["lon"]))
+    popular_sky = {
+        "mercury_retrograde": mercury.get("retrograde"),
+        "mercury_sign": mercury.get("sign"),
+        "saturn_return_distance_deg": round(saturn_distance, 2) if saturn_distance is not None else None,
+        "saturn_return_within_3deg": saturn_distance is not None and saturn_distance <= 3.0,
+        "method_note": "Apparent geocentric Mercury longitude speed and the ecliptic angular separation between transiting and natal Saturn. This is a snapshot, not an exact return-date calculation."
+    }
     return {
+        "popular_sky": popular_sky,
         "target_utc": dt.isoformat(),
         "jd_ut": jd,
         "planets": public_bodies,

@@ -39,7 +39,7 @@ function ReadingCard({ eyebrow, title, description, features, price, featured, o
       {price && <div className="premiumPrice">{price}</div>}
       <ul>{features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
       <button className="premiumCta" type="button" onClick={onChoose} disabled={!enabled}>
-        {enabled ? "Choose this reading" : "Checkout coming soon"}
+        {enabled ? "Choose this reading" : "Not available yet"}
       </button>
     </article>
   );
@@ -76,14 +76,11 @@ export default function PremiumReadings({ onCheckout, checkoutBusy = false, chec
       <div className="premiumIntro">
         <span className="premiumKicker">A little more personal ✨</span>
         <h2>Premium Readings</h2>
-        <p>The free tools show you the chart. Premium readings turn the whole chart into one carefully written story — delivered as a polished PDF you can keep, highlight and come back to.</p>
+        <p>Your chart has a story. Choose a beautifully designed personal reading you can keep, revisit and reflect on.</p>
       </div>
 
-      <div className="premiumReportPromise" aria-label="Premium report format">
-        <div><strong>Your natal chart comes first.</strong><span>The opening page includes the full birth-chart wheel so every interpretation has a visible map behind it.</span></div>
-        <div><strong>Written like a real reading.</strong><span>Long-form synthesis, gentle transitions and specific chart patterns — not copied placement blurbs stitched together.</span></div>
-        <div><strong>Secure checkout.</strong><span>Your payment is completed on a secure hosted payment page. AstroMYLA receives only the verified payment result before unlocking your report.</span></div>
-      </div>
+      <p className="premiumIntroMini">Your birth chart is the starting point. Choose how deep you want to go — you'll get a personal PDF instead of another list of generic sign descriptions.</p>
+      {enabled && catalog?.sandbox && <p className="sandboxNotice">Test checkout only · No real payments are accepted in sandbox mode.</p>}
 
       <div className="premiumGrid">
         <ReadingCard eyebrow="Paid Reading" title="Personalized Reading"
@@ -96,7 +93,7 @@ export default function PremiumReadings({ onCheckout, checkoutBusy = false, chec
           features={["Everything in the Personalized Reading","A longer, more layered whole-chart synthesis","Up to 3 personal questions or themes addressed directly","Deeper relationship, boundaries and inner-pattern analysis","Contradictory chart signatures explored instead of flattened","Premium keepsake PDF with the natal chart at the front"]}/>
       </div>
 
-      {!enabled && <p className="premiumFinePrint muted">Premium checkout is temporarily unavailable.</p>}
+      {!enabled && <p className="premiumFinePrint muted">Premium readings will open once secure payments are activated.</p>}
       <p className="premiumFinePrint muted">Astrology readings are interpretive and intended for reflection/entertainment. They are not medical, legal, financial or mental-health advice.</p>
 
       {product && (
@@ -106,7 +103,7 @@ export default function PremiumReadings({ onCheckout, checkoutBusy = false, chec
             <span className="premiumKicker">Secure checkout</span>
             <h3>{selectedTitle}</h3>
             {selectedPrice && <div className="premiumPrice">₺{selectedPrice}</div>}
-            <p className="muted">You’ll continue to a secure hosted payment page. AstroMYLA does not collect or store your card details.</p>
+            <p className="muted">You’ll continue to a secure hosted payment page. Card details are handled by the payment provider, not AstroMYLA.</p>
             <div className="checkoutGrid">
               <label>Full name<input required value={buyer.full_name} onChange={e=>setBuyer({...buyer,full_name:e.target.value})}/></label>
               <label>Email<input required type="email" value={buyer.email} onChange={e=>setBuyer({...buyer,email:e.target.value})}/></label>

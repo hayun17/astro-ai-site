@@ -60,6 +60,12 @@ class AccountStore:
             self.url = f"sqlite:///{Path(__file__).resolve().parents[1] / 'data' / 'accounts-dev.sqlite3'}"
         self._ensure_schema()
 
+    def check_connection(self) -> bool:
+        """Test the actual storage backend, not just the presence of DATABASE_URL."""
+        with closing(self._connect()) as conn:
+            row = conn.cursor().execute("SELECT 1").fetchone()
+            return bool(row and int(row[0]) == 1)
+
     def _is_postgres(self) -> bool:
         return self.url.startswith("postgres://") or self.url.startswith("postgresql://")
 
@@ -191,6 +197,29 @@ class AccountStore:
             conn.commit()
         return {"id":chart_id,"label":label,"birth":json.loads(birth_json),"created_at":now,"updated_at":now,
                 "natal_snapshot": natal_snapshot}
+
+    def get_chart(self, user_id: str, chart_id: str) -> dict[str, Any] | None:
+        with closing(self._connect()) as conn:
+            cur = self._execute(conn,
+                "SELECT id,label,birth_json,created_at,updated_at,snapshot_json FROM astromyla_saved_charts WHERE id=? AND user_id=?",
+                "SELECT id,label,birth_json,created_at,updated_at,snapshot_json FROM astromyla_saved_charts WHERE id=%s AND user_id=%s", (chart_id, user_id))
+            r = cur.fetchone()
+        if not r:
+            return None
+        return {"id":r[0], "label":r[1], "birth":json.loads(r[2]), "created_at":r[3], "updated_at":r[4],
+                "natal_snapshot":json.loads(r[5]) if r[5] else None}
+
+    def rename_chart(self, user_id: str, chart_id: str, label: str) -> bool:
+        label = " ".join(label.split())[:80]
+        if not label:
+            raise AccountAuthError("Chart name cannot be blank.")
+        with closing(self._connect()) as conn:
+            cur = self._execute(conn,
+                "UPDATE astromyla_saved_charts SET label=?, updated_at=? WHERE id=? AND user_id=?",
+                "UPDATE astromyla_saved_charts SET label=%s, updated_at=%s WHERE id=%s AND user_id=%s",
+                (label, int(time.time()), chart_id, user_id))
+            conn.commit()
+            return bool(cur.rowcount)
 
     def delete_chart(self, user_id: str, chart_id: str) -> bool:
         with closing(self._connect()) as conn:

@@ -1,76 +1,98 @@
 import React, { useState } from "react";
 
-function Reason({ evidence }: { evidence?: string[] }) {
-  if (!evidence?.length) return null;
-  return <details className="mylaWhy"><summary>How we read your chart</summary><p>Based on {evidence.join(" · ")}. These are symbolic astrological interpretations, not facts about your personality or future.</p></details>;
+type Question = "love" | "type" | "spark" | "needs";
+const QUESTIONS: { id: Question; symbol: string; title: string; sub: string }[] = [
+  {id:"love",symbol:"♡",title:"What's my love language?",sub:"Venus, Moon & Mercury"},
+  {id:"type",symbol:"✧",title:"Who's actually my type?",sub:"Your 7th house & attraction"},
+  {id:"spark",symbol:"⚡",title:"Why do I catch feelings?",sub:"Spark vs. stability"},
+  {id:"needs",symbol:"☾",title:"How should someone love me?",sub:"Your emotional cheat sheet"},
+];
+function Evidence({items}:{items?:string[]}) {
+  return <details className="cosmicEvidence"><summary>Show the placements behind this reading</summary>
+    <p>{items?.length ? items.join(" · ") : "Not enough reliable placement data for a precise explanation."}</p>
+    <small>These are symbolic astrology interpretations, not facts about someone's personality or a relationship's future.</small>
+  </details>;
 }
-function Tags({ items, limit = 4 }: { items?: string[]; limit?: number }) {
-  return <div className="mylaTraitTags">{(items || []).slice(0, limit).map((s: string, i: number) => <span key={`${s}-${i}`}>{s}</span>)}</div>;
+function Traits({values}:{values?:string[]}) {
+  if(!values?.length) return null;
+  return <div className="cosmicTraits">{values.slice(0,4).map((value,i)=><span key={`${value}-${i}`}>{value}</span>)}</div>;
 }
-
-export function NatalSignatureSuite({ data }: { data: any }) {
-  const [side, setSide] = useState<"spark" | "steadiness">("spark");
-  if (!data) return null;
-  const sig = data.signature, partner = data.partner_blueprint, split = data.attract_vs_need, manual = data.emotional_manual;
-  return <section className="mylaStorySuite" aria-label="AstroMYLA signature insights">
-    {sig && <article className="mylaStoryHero">
-      <span className="mylaStarArt" aria-hidden="true">✧</span>
-      <span className="mylaHeroEyebrow">✦ YOUR ASTROMYLA SIGNATURE</span>
-      <h3>{sig.headline}</h3>
-      <p className="mylaHeroDescription">{sig.summary}</p>
-      <div className="mylaHeroDivider"/>
-      <span className="mylaMicroLabel">YOUR VIBE IN FOUR WORDS</span>
-      <Tags items={sig.core_energy} />
-      <div className="mylaHeroFooter"><span>{sig.dominant_element} energy</span><span>{sig.dominant_modality} energy</span></div>
-      <Reason evidence={sig.evidence}/>
-    </article>}
-
-    {partner && <article className="mylaEditorial mylaPartner">
-      <div className="mylaEditorialIcon" aria-hidden="true">♡</div>
-      <span className="mylaMicroLabel">THE RELATIONSHIP BLUEPRINT</span>
-      <h3>So, who's your kind of person?</h3>
-      <p className="mylaEditorialLead">Not a zodiac sign. A feeling. Your chart points toward someone who can meet you emotionally <em>and</em> keep things interesting.</p>
-      <div className="mylaProfileLines">
-        <div><span>THE WAY THEY LOVE</span><p>{partner.emotional_style}</p></div>
-        <div><span>THE WAY THEY TALK</span><p>{partner.communication}</p></div>
-        <div><span>THE SPARK</span><Tags items={partner.attraction} limit={3}/></div>
-        <div><span>WHAT MAKES IT LAST</span><Tags items={partner.long_term} limit={3}/></div>
-      </div>
-      {partner.time_note && <p className="mylaQuietNote">{partner.time_note}</p>}
-      <Reason evidence={partner.evidence}/>
-    </article>}
-
-    {split && <article className="mylaEditorial mylaAttraction">
-      <span className="mylaMicroLabel">THE TWIST ✨</span>
-      <h3>The spark isn't always the safe place.</h3>
-      <p className="mylaEditorialLead">Sometimes the traits that catch your eye aren't the same ones that help love feel steady. Explore both sides of your chart.</p>
-      <div className="mylaSwitch" role="group" aria-label="Attraction versus compatibility"><button type="button" aria-pressed={side === "spark"} className={side === "spark" ? "selected" : ""} onClick={() => setSide("spark")}>⚡ Who catches your eye</button><button type="button" aria-pressed={side === "steadiness"} className={side === "steadiness" ? "selected" : ""} onClick={() => setSide("steadiness")}>♡ Who feels right</button></div>
-      <div className="mylaSwitchContent" key={side}>
-        <span>{side === "spark" ? "WHAT PULLS YOU IN" : "WHAT HELPS YOU THRIVE"}</span>
-        <Tags items={side === "spark" ? split.attract : split.need} limit={5}/>
-        <p>{side === "spark" ? "The immediate magnetism — exciting, compelling, sometimes complicated." : "The qualities that can support trust, understanding and real consistency over time."}</p>
-      </div>
-      <Reason evidence={split.evidence}/>
-    </article>}
-
-    {manual && <article className="mylaEditorial mylaManual">
-      <span className="mylaMicroLabel">A LITTLE NOTE TO SOMEONE WHO LOVES YOU</span>
-      <h3>Here's how to love you well.</h3>
-      <p className="mylaEditorialLead">Imagine handing your person a tiny note that says, “These things help me feel seen.”</p>
-      <div className="mylaManualMain"><span>♡ MORE OF THIS, PLEASE</span><p>{(manual.helps || []).slice(0,3).join(" · ")}</p></div>
-      <div className="mylaManualBottom"><div><span>WHEN THINGS GET TENSE</span><p>{manual.repair_style}</p></div><div><span>WHAT REASSURES YOU</span><p>{manual.reassurance}</p></div></div>
-      <Reason evidence={manual.evidence}/>
-    </article>}
+function NatalBigThree({chart}:{chart:any}) {
+  const sun=chart?.planets?.Sun, moon=chart?.planets?.Moon, rising=chart?.points?.Asc;
+  const timeUnknown=Boolean(chart?.time_unknown);
+  const items=[
+    {icon:"☼",name:"Your Sun",value:sun?.sign||"—",meaning:"Your core drive"},
+    {icon:"☾",name:"Your Moon",value:moon?.sign_uncertain ? "Time needed" : moon?.sign || "Time needed",meaning:"Your inner world"},
+    {icon:"↑",name:"Your Rising",value:timeUnknown ? "Time needed" : rising?.sign||"Time needed",meaning:"Your first impression"},
+  ];
+  return <div className="cosmicBigThree" aria-label="Your Big Three">
+    {items.map(item=><div key={item.name} className="cosmicBigThreeItem"><span className="cosmicPlanetIcon">{item.icon}</span><div><small>{item.name}</small><strong>{item.value}</strong><span>{item.meaning}</span></div></div>)}
+  </div>;
+}
+export function NatalSignatureSuite({data,chart}:{data:any;chart?:any}) {
+  const [active,setActive]=useState<Question>("love");
+  if(!data) return null;
+  const signature=data.signature || {};
+  const blueprint=data.partner_blueprint || {};
+  const split=data.attract_vs_need || {};
+  const manual=data.emotional_manual || {};
+  const venus=chart?.planets?.Venus?.sign;
+  const moon=chart?.planets?.Moon?.sign_uncertain ? null : chart?.planets?.Moon?.sign;
+  const mercury=chart?.planets?.Mercury?.sign;
+  return <section className="cosmicSection" aria-label="Popular questions about your birth chart">
+    <div className="cosmicHeading"><span className="cosmicEyebrow">✦ THE ASTROMYLA EDIT</span><h3>Okay, here's the interesting part.</h3>
+      <p>Forget the generic horoscope. Let's answer the questions people actually ask about their chart.</p>
+    </div>
+    <NatalBigThree chart={chart}/>
+    <div className="cosmicQuestionNav" role="tablist" aria-label="Explore your chart">
+      {QUESTIONS.map(item=><button key={item.id} type="button" role="tab" id={`myla-tab-${item.id}`} aria-controls="myla-story" aria-selected={active===item.id} className={active===item.id?"cosmicQuestion active":"cosmicQuestion"} onClick={()=>setActive(item.id)}>
+        <span className="cosmicQuestionIcon">{item.symbol}</span><span className="cosmicQuestionText"><strong>{item.title}</strong><small>{item.sub}</small></span><span className="cosmicQuestionArrow">↗</span>
+      </button>)}
+    </div>
+    <article className={`cosmicAnswer cosmicAnswer-${active}`} id="myla-story" role="tabpanel" aria-labelledby={`myla-tab-${active}`}>
+      <span className="cosmicEyebrow">YOUR CHART, WITHOUT THE FLUFF</span>
+      {active==="love" && <>
+        <h4>You don't love by just one rule.</h4>
+        <p className="cosmicLead">{venus ? <>With <strong>Venus in {venus}</strong>, your style of showing affection has its own signature. </> : "Your Venus placement isn't available. "}
+          {moon ? <>But your <strong>{moon} Moon</strong> says emotional safety matters just as much as attraction. </> : "An exact birth time can help resolve Moon-dependent details. "}
+          {mercury ? <>And <strong>Mercury in {mercury}</strong>? That's the part that shapes how you talk things through.</> : null}</p>
+        <div className="cosmicQuote"><span>WHAT FEELS LIKE LOVE TO YOU</span><p>{blueprint.emotional_style || "Honest care and room to be yourself."}</p></div>
+        <div className="cosmicAnswerFoot"><span>How to communicate with you</span><p>{blueprint.communication || "Make intentions clear and listen closely."}</p></div>
+        <Evidence items={[...(manual.evidence||[]),...(blueprint.evidence||[])]}/>
+      </>}
+      {active==="type" && <>
+        <h4>So, who's actually your kind of person?</h4>
+        <p className="cosmicLead">Not a destined Sun sign — more like the qualities that make a connection feel worth exploring. The chart suggests you might be drawn to people with this energy:</p>
+        <Traits values={blueprint.attraction}/>
+        <div className="cosmicQuote"><span>FOR THE LONG HAUL</span><Traits values={blueprint.long_term}/></div>
+        {blueprint.time_note && <p className="cosmicNote">{blueprint.time_note}</p>}
+        <Evidence items={blueprint.evidence}/>
+      </>}
+      {active==="spark" && <>
+        <h4>The spark and the safe place can be different.</h4>
+        <p className="cosmicLead">You know that instant click? It's worth asking whether the same qualities still feel good after the excitement settles. Here are the two sides your placements emphasize:</p>
+        <div className="cosmicTwoSides"><div><span>⚡ WHAT CATCHES YOUR EYE</span><Traits values={split.attract}/></div><div><span>♡ WHAT FEELS GOOD OVER TIME</span><Traits values={split.need}/></div></div>
+        <Evidence items={split.evidence}/>
+      </>}
+      {active==="needs" && <>
+        <h4>Send this to someone who loves you.</h4>
+        <p className="cosmicLead">“I don't need you to read my mind. I just feel more understood when there's {manual.helps?.[0] || "honest attention and care"}.”</p>
+        <div className="cosmicQuote"><span>WHEN WE HAVE AN ARGUMENT</span><p>{manual.repair_style || "Give each other space to understand what happened."}</p></div>
+        <div className="cosmicAnswerFoot"><span>What actually reassures you</span><p>{manual.reassurance}</p></div>
+        <Evidence items={manual.evidence}/>
+      </>}
+    </article>
+    <div className="cosmicIdentity"><span>✧ YOUR ASTROMYLA SIGNATURE</span><strong>{signature.headline || "A one-of-a-kind chart"}</strong><small>{signature.dominant_element && `${signature.dominant_element} emphasis`}{signature.dominant_modality && ` · ${signature.dominant_modality} emphasis`}</small></div>
   </section>;
 }
-
-export function MylaMatch({ match }: { match: any }) {
-  if (!match?.themes?.length) return null;
-  return <section className="mylaEditorial mylaMatchEditorial">
-    <span className="mylaMicroLabel">MYLA MATCH ✦</span>
-    <h3>Okay, here's the chemistry.</h3>
-    <p className="mylaEditorialLead">Not a magic compatibility percentage — these are the patterns your two charts actually activate together.</p>
-    <div className="mylaMatchFeatures">{match.themes.slice(0,4).map((theme:any,i:number) => <div key={`${theme.title}-${i}`}><span>0{i+1}</span><div><strong>{theme.title}</strong><p>{theme.description}</p><small>{theme.evidence}</small></div></div>)}</div>
-    <p className="mylaQuietNote">{match.method_note}</p>
+export function MylaMatch({match}:{match:any}) {
+  const [focus,setFocus]=useState(0);
+  if(!match?.themes?.length)return null;
+  const themes=(match.themes||[]).slice(0,4);
+  const selected=themes[Math.min(focus,themes.length-1)];
+  return <section className="cosmicMatch" aria-label="What connects your charts">
+    <span className="cosmicEyebrow">♡ MYLA MATCH</span><h3>What's the actual chemistry here?</h3><p>These are the patterns that show up in your two charts — not a random “soulmate percentage”.</p>
+    <div className="cosmicMatchNav">{themes.map((t:any,i:number)=><button type="button" key={`${i}-${t.title}`} className={focus===i?"active":""} onClick={()=>setFocus(i)}>{t.title}</button>)}</div>
+    <div className="cosmicMatchStory"><strong>{selected.title}</strong><p>{selected.description}</p><small>{selected.evidence}</small></div>
   </section>;
 }
