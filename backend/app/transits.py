@@ -6,6 +6,7 @@ from typing import Any
 import swisseph as swe
 
 from .chart import ASPECTS, angular_separation, compute_all_bodies, compute_object_house, deg_to_sign, wrap360
+from .transit_reading import build_transit_reading, render_transit_reading
 
 TRANSIT_BODIES = [
     "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn",
@@ -135,7 +136,7 @@ def compute_personal_transits(natal: dict[str, Any], birth: Any, target_date: da
         "saturn_return_within_3deg": saturn_distance is not None and saturn_distance <= 3.0,
         "method_note": "Apparent geocentric Mercury longitude speed and the ecliptic angular separation between transiting and natal Saturn. This is a snapshot, not an exact return-date calculation."
     }
-    return {
+    result = {
         "popular_sky": popular_sky,
         "target_utc": dt.isoformat(),
         "jd_ut": jd,
@@ -145,30 +146,11 @@ def compute_personal_transits(natal: dict[str, Any], birth: Any, target_date: da
         "top_aspects": aspects[:10],
         "method_note": "Transiting planetary longitudes are calculated with Swiss Ephemeris and compared with the natal chart using tighter transit orbs. Applying/separating status is estimated from the aspect's change over the next six hours.",
     }
+    result["reading"] = build_transit_reading(result, natal)
+    return result
 
 
 def build_daily_transit_interpretation(data: dict[str, Any], natal: dict[str, Any]) -> str:
-    rows = data.get("top_aspects") or []
-    houses = data.get("house_overlays") or []
-    lines = [
-        "### Your current sky",
-        "This is a timing snapshot, not a prediction of fixed events. The strongest entries are the closest and most astrologically weighted contacts active around the selected day.",
-    ]
-    if not rows:
-        lines.append("No major transit-to-natal aspects are especially tight inside the current transit orbs.")
-    else:
-        lines.append("\n### Strongest active transits")
-        for row in rows[:8]:
-            motion = "applying" if row.get("applying") else "separating"
-            lines.append(f"- **Transit {row['transit']} {row['aspect']} natal {row['natal']}** — orb {float(row['orb']):.2f}° · {motion}.")
-    if houses:
-        lines.append("\n### Where the sky is landing in your chart")
-        for row in houses[:10]:
-            lines.append(f"- **{row['planet']} through your {row['house']}th house** emphasizes {row['theme']}.")
-    if natal.get("time_unknown"):
-        lines.append("\nBecause the birth time is unknown, natal houses and angles are intentionally excluded from this daily reading.")
-    lines.extend([
-        "\n### How to use this",
-        "Outer-planet transits usually describe longer chapters; faster planets often act as short-term triggers or mood/attention shifts. Repeated themes matter more than any single contact.",
-    ])
-    return "\n".join(lines)
+    """Guaranteed useful fallback; every line follows computed aspects/houses."""
+    reading = data.get("reading") or build_transit_reading(data, natal)
+    return render_transit_reading(reading)

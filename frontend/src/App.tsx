@@ -9,6 +9,7 @@ import PremiumReadings from "./components/PremiumReadings";
 import InterpretationView from "./components/InterpretationView";
 import SynastryBiWheel from "./components/chart/SynastryBiWheel";
 import TransitBiWheel from "./components/chart/TransitBiWheel";
+import TransitReading from "./components/TransitReading";
 import AccountPanel from "./components/AccountPanel";
 import CalculationProgress from "./components/CalculationProgress";
 import { ConnectionProfile, CompositeSignature } from "./components/ResultInsights";
@@ -452,6 +453,8 @@ export default function App() {
 
             {mode === "transits" && (
               <>
+                <TransitReading reading={result.transits?.reading} />
+                <details className="transitLongForm"><summary>Explore the chart wheel, precise aspects and planetary positions</summary>
                 <div className="cosmicSkyCards">
                   <div><span>☿ MERCURY RETROGRADE</span><strong>{result.transits?.popular_sky?.mercury_retrograde === true ? "Yes, Mercury is retrograde" : result.transits?.popular_sky?.mercury_retrograde === false ? "No, Mercury is direct" : "Unavailable"}</strong><p>{result.transits?.popular_sky?.mercury_sign ? `Mercury in ${result.transits.popular_sky.mercury_sign} · apparent geocentric motion` : "Current planetary data unavailable"}</p></div>
                   <div><span>♄ SATURN RETURN CHECK</span><strong>{result.transits?.popular_sky?.saturn_return_within_3deg ? "Close to your natal Saturn" : "Not within 3° of natal Saturn"}</strong><p>{result.transits?.popular_sky?.saturn_return_distance_deg != null ? `${result.transits.popular_sky.saturn_return_distance_deg}° from your natal Saturn · current snapshot` : "Saturn data unavailable"}</p></div>
@@ -461,7 +464,8 @@ export default function App() {
                   <div className="overlayCard"><strong>Strongest active transits</strong><div className="overlayList">{(result.transits?.top_aspects||[]).slice(0,8).map((x:any,i:number)=><span key={i}><b>{x.transit} {x.aspect} natal {x.natal}</b> · {Number(x.orb).toFixed(2)}° · {x.applying?"applying":"separating"}</span>)}</div></div>
                   <div className="overlayCard"><strong>Planets moving through your natal houses</strong><div className="overlayList">{(result.transits?.house_overlays||[]).slice(0,10).map((x:any)=><span key={x.planet}><b>{x.planet} → House {x.house}</b> · {x.theme}</span>)}{!(result.transits?.house_overlays||[]).length&&<span className="muted">House transits require a known birth time.</span>}</div></div>
                 </div>
-                <p className="muted methodNote">Current transits describe symbolic timing and emphasis, not fixed predictions.</p>
+                <p className="muted methodNote">Applying/separating is estimated from motion over the next six hours. A single day's snapshot is not a prediction of events.</p>
+                </details>
               </>
             )}
 
@@ -518,10 +522,14 @@ export default function App() {
             {mode === "astrocartography" && <AstrocartographyMap data={result.astrocartography} />}
           </section>
 
-          <section className="card interpretationCard">
-            <div className="resultHeader"><h2>Interpretation ✨</h2></div>
-            <InterpretationView text={result.interpretation} />
-          </section>
+          {mode === "transits" ? (
+            <section className="card interpretationCard"><details className="transitLongForm"><summary>Read the detailed written transit notes</summary><InterpretationView text={result.interpretation} /></details></section>
+          ) : (
+            <section className="card interpretationCard">
+              <div className="resultHeader"><h2>Interpretation ✨</h2></div>
+              <InterpretationView text={result.interpretation} />
+            </section>
+          )}
         </>
       )}
 

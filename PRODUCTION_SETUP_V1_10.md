@@ -1,3 +1,5 @@
+> **v1.10.1 update:** For the current Transit Stories release, deploy using `DEPLOY_ASTROMYLA_V1_10_1.ps1` and expected previous SHA `e61a06bb3bdbae44a9dcbee00168658f873d0c68`. The historical v1.10.0 instructions below remain for reference. The transit feature does not need `DATABASE_URL`; accounts and payments do.
+
 # AstroMYLA v1.10 · Production setup (read before any charge)
 
 **Security rule:** never paste merchant API keys, OpenAI keys, SMTP password, or DATABASE_URL into chat or GitHub. Place them only in the Render *backend* Environment page.

@@ -1504,3 +1504,46 @@ button.placeSuggestion:focus-visible {
 .houseStoryV2{padding:clamp(19px,3vw,31px);border:1px solid #e2cce8;background:linear-gradient(135deg,#fffafc,#f6ecfa);border-radius:25px;margin:23px 0}.houseStoryV2 h3{font:500 clamp(29px,4vw,41px)/1.12 Georgia,serif;color:#503260;margin:9px 0}.houseStoryV2>p{font-size:15px;color:#705a79;line-height:1.6;max-width:710px}.houseStorySwitcher{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0 13px}.houseStorySwitcher button{min-width:0;background:#fff;border:1px solid #e5d2ec;padding:14px;border-radius:15px;color:#654873;display:grid;gap:5px;text-align:left;box-shadow:none}.houseStorySwitcher button.active{background:#634178;color:white;border-color:#634178}.houseStorySwitcher button strong{font-size:14px;overflow-wrap:anywhere}.houseStorySwitcher button small{font-size:11px;opacity:.75}.houseStoryFocus{padding:clamp(17px,3vw,29px);border-radius:17px;background:#fff;border:1px solid #e9dceb}.houseStoryFeature{display:flex;gap:18px;border-bottom:1px solid #eee1ee;padding:10px 0 18px;margin-bottom:18px}.houseStoryFeature:last-of-type{border-bottom:0;margin-bottom:0}.houseStoryFeatureNum{font:500 64px/.9 Georgia,serif;color:#dcc0df;min-width:70px}.houseStoryFeatureCopy{min-width:0;flex:1}.houseStoryFeatureCopy>small{font-size:10px;letter-spacing:.12em;font-weight:850;color:#946e9b}.houseStoryFeatureCopy h4{font:500 28px Georgia,serif;color:#4a305b;margin:8px 0 0}.houseStoryFeatureCopy>p{color:#5f4b67;font-size:14px;line-height:1.75}.houseStoryFeatureOpening{font-weight:750;color:#563868!important}.houseStoryFeatureCopy .cosmicTraits{margin:12px 0}.houseStoryExpand{width:100%;border:1px solid #e3d1ec;background:#f7edf9;color:#623d78;box-shadow:none;border-radius:13px;padding:13px;font-weight:750}.houseStoryV2 .cosmicEvidence{margin-top:13px}@media(max-width:640px){.houseStoryFeature{gap:10px}.houseStoryFeatureNum{font-size:39px;min-width:38px}.houseStorySwitcher button{padding:10px}.houseStorySwitcher button strong{font-size:12px}.houseStoryFocus{padding:17px}.houseStoryFeatureCopy h4{font-size:24px}}
 .premiumIntroMini {max-width:730px;font-size:14px;line-height:1.7;color:#685376}.sandboxNotice{padding:12px 17px;border-radius:14px;background:#fff7de;color:#664e24;border:1px solid #e9cd89;font-weight:800;font-size:13px}
 .cosmicSkyCards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0 20px}.cosmicSkyCards>div{background:linear-gradient(135deg,#fff7fc,#f5ebfc);border:1px solid #e6d4ed;border-radius:18px;padding:20px;min-width:0}.cosmicSkyCards>div span{display:block;letter-spacing:.1em;font-weight:850;color:#98749d;font-size:11px}.cosmicSkyCards>div strong{display:block;font:500 clamp(20px,2.5vw,27px) Georgia,serif;color:#50305f;margin:10px 0}.cosmicSkyCards>div p{font-size:12px;line-height:1.6;color:#80668a;margin:0}@media(max-width:600px){.cosmicSkyCards{grid-template-columns:1fr}}
+
+/* v1.10.1: make the *reading* the first thing users see, not just a list of orbs. */
+.transitStory{margin:16px 0 24px;color:#402b4d}
+.transitStoryLead{border:1px solid #e6d4ed;border-radius:24px;padding:clamp(21px,3.4vw,37px);background:radial-gradient(circle at 93% 0%,rgba(224,195,247,.75),transparent 47%),linear-gradient(145deg,#fff9fc,#f9f3ff);box-shadow:0 13px 28px rgba(98,59,123,.07)}
+.transitStoryTop{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.transitStoryEyebrow,.transitStorySectionTitle>span,.transitInsightIndex,.transitTry>span,.transitHouseNumber{font-size:11px!important;line-height:1.5;letter-spacing:.12em;font-weight:850;color:#9757a6}
+.transitStoryDate{font-size:12px;color:#775f83;background:rgba(255,255,255,.7);border:1px solid #eadff1;padding:6px 11px;border-radius:100px}
+.transitStoryLead h3{font-family:Georgia,serif;font-weight:500;color:#4c2b60;font-size:clamp(24px,4.7vw,38px);line-height:1.2;letter-spacing:-.02em;margin:15px 0 14px}
+.transitStoryLead>p,.transitMainInsight>p{font-size:clamp(15px,1.5vw,17px);line-height:1.8;max-width:74ch;margin:0}
+.transitMainInsight{margin-top:14px;padding:clamp(20px,3vw,32px);border:1px solid #e4d2ec;border-radius:23px;background:linear-gradient(135deg,#fcf6fe,#fff9fb);box-shadow:0 11px 27px rgba(98,59,123,.06)}
+.transitInsightTitle{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.transitMotion{font-size:12px;font-weight:700;color:#684c7c;border-radius:50px;background:#f2e8f8;padding:6px 11px}
+.transitMainInsight h4{font-family:Georgia,serif;color:#513064;font-size:clamp(23px,3vw,31px);font-weight:500;margin:14px 0}
+.transitInsightMeta{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 18px}
+.transitInsightMeta span{font-size:12px;color:#745880;background:#fff;border:1px solid #eaddee;border-radius:50px;padding:6px 11px}
+.transitTry{background:#fff;border-left:3px solid #bf86c9;border-radius:4px 13px 13px 4px;padding:14px 18px;margin-top:20px}
+.transitTry p{font-size:16px;line-height:1.55;margin:7px 0 0;color:#50345b;font-weight:600}
+.transitMore,.transitHousesStory{margin-top:28px}
+.transitStorySectionTitle>span{display:block}
+.transitStorySectionTitle h4{font-family:Georgia,serif;font-size:clamp(20px,2.5vw,27px);font-weight:500;color:#523063;margin:5px 0 15px}
+.transitDetailsStack{display:grid;gap:9px}
+.transitStoryDetail{background:#fffafd;border:1px solid #e9deed;border-radius:17px;overflow:hidden}
+.transitStoryDetail summary{cursor:pointer;display:flex;gap:14px;align-items:center;padding:17px;list-style:none}
+.transitStoryDetail summary::-webkit-details-marker{display:none}
+.transitDetailNumber{color:#a27cad;font:600 15px Georgia,serif;flex:0 0 auto}
+.transitDetailName{font-weight:750;flex:1;font-size:15px;line-height:1.35}
+.transitDetailName small{display:block;font-size:12px;font-weight:400;color:#866d8d;margin-top:5px}
+.transitDetailToggle{font-size:24px;color:#9874a7;line-height:1}
+.transitStoryDetail[open] .transitDetailToggle{transform:rotate(45deg)}
+.transitDetailBody{padding:0 19px 17px 46px;line-height:1.75;color:#5b4964}
+.transitDetailBody p{margin:8px 0}
+.transitReflection{font-weight:600;color:#704c7b}
+.transitHouseCards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,215px),1fr));gap:12px}
+.transitHouseCard{padding:19px;background:#fff;border:1px solid #e9dcec;border-radius:18px;min-width:0}
+.transitHouseCard h5{font:500 20px/1.3 Georgia,serif;color:#563568;margin:8px 0 12px}
+.transitHouseCard p{font-size:14px;line-height:1.7;color:#5d4b64;margin:0 0 10px}
+.transitHouseCard small{font-size:13px;color:#805d88;font-weight:600;line-height:1.55;display:block}
+.transitPrecisionNote{border:1px solid #e3d8ee;background:#f9f2ff;border-radius:12px;padding:14px;line-height:1.6;color:#6b4a7e;margin:17px 0}
+.transitDisclaimer{margin:16px 2px 0;font-size:12px;color:#7e7083;line-height:1.6}
+.transitLongForm{border:1px solid #e5d6e9;border-radius:18px;padding:18px;margin:10px 0 22px;background:#fffafd}
+.transitLongForm>summary{cursor:pointer;color:#684478;font-weight:800;padding:5px}
+.transitLongForm[open]>summary{margin-bottom:17px}
+@media(max-width:620px){.transitMainInsight,.transitStoryLead{border-radius:19px;padding:20px}.transitHouseCards{grid-template-columns:1fr}.transitDetailBody{padding:0 16px 17px 17px}}

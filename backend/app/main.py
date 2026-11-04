@@ -46,7 +46,7 @@ from .synastry_story import build_directional_house_stories
 
 load_dotenv()
 
-APP_VERSION = "1.10.0"
+APP_VERSION = "1.10.1"
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production").lower()
 EXPOSE_DEBUG_DATA = os.getenv("EXPOSE_DEBUG_DATA", "false").lower() in {"1", "true", "yes", "on"}
 PREMIUM_REPORT_TOKEN = os.getenv("PREMIUM_REPORT_TOKEN", "").strip()
